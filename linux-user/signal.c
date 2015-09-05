@@ -5534,7 +5534,7 @@ long do_sigreturn(CPUAlphaState *env)
 
     restore_sigcontext(env, sc);
     unlock_user_struct(sc, sc_addr, 0);
-    return env->ir[IR_V0];
+    return -TARGET_QEMU_ESIGRETURN;
 
 badframe:
     force_sig(TARGET_SIGSEGV);
@@ -5561,7 +5561,7 @@ long do_rt_sigreturn(CPUAlphaState *env)
     }
 
     unlock_user_struct(frame, frame_addr, 0);
-    return env->ir[IR_V0];
+    return -TARGET_QEMU_ESIGRETURN;
 
 
 badframe:
