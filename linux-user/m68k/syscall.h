@@ -23,5 +23,3 @@ struct target_pt_regs {
 #define TARGET_MLOCKALL_MCL_FUTURE  2
 
 void do_m68k_simcall(CPUM68KState *, int);
-
-#define TARGET_USE_ERESTARTSYS 1

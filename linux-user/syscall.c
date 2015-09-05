@@ -654,7 +654,7 @@ abi_long convert_syscall_return_value(abi_long ret) {
     return ret;
 }
 
-#if defined(CONFIG_SAFE_SYSCALL) && defined(TARGET_USE_ERESTARTSYS)
+#ifdef CONFIG_SAFE_SYSCALL
 
 #define safe_syscall0(type, name) \
 static type safe_##name (void) \
@@ -5980,7 +5980,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
     struct statfs stfs;
     void *p;
 
-#if defined(DEBUG_ERESTARTSYS) && defined(TARGET_USE_ERESTARTSYS)
+#ifdef DEBUG_ERESTARTSYS
     {
         static int flag;
         flag = !flag;

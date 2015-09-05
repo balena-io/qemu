@@ -210,10 +210,7 @@ int block_signals(void)
     pending |= 2;
     ts->signal_pending = pending;
 
-#ifdef TARGET_USE_ERESTARTSYS
     return pending & 1;
-#endif
-    return 0;
 }
 
 /* Wrapper for sigprocmask function
