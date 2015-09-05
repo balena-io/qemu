@@ -568,6 +568,10 @@ int queue_signal(CPUArchState *env, int sig, target_siginfo_t *info)
     }
 }
 
+#if defined(__x86_64__)
+#define PC_SIG (uc->uc_mcontext.gregs[REG_RIP])
+#endif
+
 static void host_signal_handler(int host_signum, siginfo_t *info,
                                 void *puc)
 {
@@ -590,6 +594,14 @@ static void host_signal_handler(int host_signum, siginfo_t *info,
 #if defined(DEBUG_SIGNAL)
     fprintf(stderr, "qemu: got signal %d\n", sig);
 #endif
+    struct ucontext *uc = puc;
+
+#ifdef CONFIG_SAFE_SYSCALL
+    if (PC_SIG > (uintptr_t)safe_syscall_start
+            && PC_SIG < (uintptr_t)safe_syscall_end)
+        PC_SIG = (uintptr_t)safe_syscall_start;
+#endif
+
     host_to_target_siginfo_noswap(&tinfo, info);
     if (queue_signal(env, sig, &tinfo) == 1) {
         /* interrupt the virtual CPU as soon as possible */

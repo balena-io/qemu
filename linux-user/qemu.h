@@ -207,8 +207,25 @@ unsigned long init_guest_space(unsigned long host_start,
 
 #include "qemu/log.h"
 
+/* safe_syscall.S */
+
+/* Call a system call if guest signal not pending.
+ * Returns -TARGET_ESIGRETURN if signal pending.
+ * Returns guest error code on error.
+ */
+
+extern long safe_syscall_base(volatile int *pending, long number, ...);
+#define safe_syscall(...) \
+    safe_syscall_base(&((TaskState *)thread_cpu->opaque)->signal_pending, \
+    __VA_ARGS__)
+
+/* For host_signal_handler() */
+extern char safe_syscall_start[];
+extern char safe_syscall_end[];
+
 /* syscall.c */
 int host_to_target_waitstatus(int status);
+abi_long convert_syscall_return_value(abi_long ret);
 
 /* strace.c */
 void print_syscall(int num,
