@@ -491,19 +491,10 @@ int queue_signal(CPUArchState *env, int sig, target_siginfo_t *info)
 {
     CPUState *cpu = ENV_GET_CPU(env);
     TaskState *ts = cpu->opaque;
-    struct emulated_sigtable *k;
 
     trace_user_queue_signal(env, sig);
-    k = &ts->sigtab[sig - 1];
-
-    /* we queue exactly one signal */
-    if (k->pending) {
-        return 0;
-    }
-
-    k->info = *info;
-    k->pending = 1;
-    /* signal that a new signal is pending */
+    ts->sync_signal.info = *info;
+    ts->sync_signal.pending = sig;
     ts->signal_pending = 1;
     return 1; /* indicates that the signal was queued */
 }
@@ -516,8 +507,12 @@ static void host_signal_handler(int host_signum, siginfo_t *info,
                                 void *puc)
 {
     CPUArchState *env = thread_cpu->env_ptr;
+    CPUState *cpu = ENV_GET_CPU(env);
+    TaskState *ts = cpu->opaque;
+
     int sig;
     target_siginfo_t tinfo;
+    struct emulated_sigtable *k;
 
     /* the CPU emulator uses some host signals to detect exceptions,
        we forward to it some signals */
@@ -541,15 +536,18 @@ static void host_signal_handler(int host_signum, siginfo_t *info,
 #endif
 
     host_to_target_siginfo_noswap(&tinfo, info);
-    if (queue_signal(env, sig, &tinfo) == 1) {
-        /* Block host signals until target signal handler entered */
-        sigfillset(&uc->uc_sigmask);
-        sigdelset(&uc->uc_sigmask, SIGSEGV);
-        sigdelset(&uc->uc_sigmask, SIGBUS);
+    k = &ts->sigtab[sig - 1];
+    k->info = tinfo;
+    k->pending = sig;
+    ts->signal_pending = 1;
 
-        /* interrupt the virtual CPU as soon as possible */
-        cpu_exit(thread_cpu);
-    }
+    /* Block host signals until target signal handler entered */
+    sigfillset(&uc->uc_sigmask);
+    sigdelset(&uc->uc_sigmask, SIGSEGV);
+    sigdelset(&uc->uc_sigmask, SIGBUS);
+
+    /* interrupt the virtual CPU as soon as possible */
+    cpu_exit(thread_cpu);
 }
 
 /* do_sigaltstack() returns target values and errnos. */
@@ -5736,12 +5734,26 @@ restart:
     sigfillset(&set);
     sigprocmask(SIG_SETMASK, &set, 0);
 
+    if (ts->sync_signal.pending) {
+        k = &ts->sync_signal;
+        sig = k->pending;
+
+        /* Synchronous signals are forced,
+         * see force_sig_info() and callers in Linux */
+        if (sigismember(&ts->signal_mask, target_to_host_signal_table[sig])
+                || sigact_table[sig - 1]._sa_handler == TARGET_SIG_IGN) {
+            sigdelset(&ts->signal_mask, target_to_host_signal_table[sig]);
+            sigact_table[sig - 1]._sa_handler = TARGET_SIG_DFL;
+        }
+
+       goto handle_signal;
+    }
+
  next_signal:
     k = ts->sigtab;
     for(sig = 1; sig <= TARGET_NSIG; sig++) {
-        if (k->pending && (
-                    !sigismember(&ts->signal_mask, target_to_host_signal_table[sig])
-                    || sig == TARGET_SIGSEGV)) {
+        if (k->pending &&
+             !sigismember(&ts->signal_mask, target_to_host_signal_table[sig])) {
             goto handle_signal;
         }
         k++;
@@ -5766,14 +5778,6 @@ restart:
     } else {
         sa = &sigact_table[sig - 1];
         handler = sa->_sa_handler;
-    }
-
-    if (sig == TARGET_SIGSEGV && sigismember(&ts->signal_mask, SIGSEGV)) {
-        /* Guest has blocked SIGSEGV but we got one anyway. Assume this
-         * is a forced SIGSEGV (ie one the kernel handles via force_sig_info
-         * because it got a real MMU fault), and treat as if default handler.
-         */
-        handler = TARGET_SIG_DFL;
     }
 
     if (handler == TARGET_SIG_DFL) {
