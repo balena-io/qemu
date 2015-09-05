@@ -121,6 +121,7 @@ typedef struct TaskState {
     struct image_info *info;
     struct linux_binprm *bprm;
 
+    struct emulated_sigtable sync_signal;
     struct emulated_sigtable sigtab[TARGET_NSIG];
     sigset_t signal_mask;
 
