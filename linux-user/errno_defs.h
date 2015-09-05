@@ -139,3 +139,6 @@
 /* for robust mutexes */
 #define TARGET_EOWNERDEAD      130     /* Owner died */
 #define TARGET_ENOTRECOVERABLE 131     /* State not recoverable */
+
+#define TARGET_ERESTARTSYS     512  /* Restart system call */
+#define TARGET_QEMU_ESIGRETURN 513  /* Return from signal */
