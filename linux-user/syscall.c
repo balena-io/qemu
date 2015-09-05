@@ -6518,7 +6518,11 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
         ret = 0;
         break;
     case TARGET_NR_kill:
-        ret = get_errno(kill(arg1, target_to_host_signal(arg2)));
+        if (block_signals()) {
+            ret = -TARGET_ERESTARTSYS;
+        } else {
+            ret = get_errno(kill(arg1, target_to_host_signal(arg2)));
+        }
         break;
 #ifdef TARGET_NR_rename
     case TARGET_NR_rename:
