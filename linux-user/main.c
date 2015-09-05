@@ -2907,14 +2907,14 @@ void cpu_loop(CPUMBState *env)
                 queue_signal(env, info.si_signo, &info);
             }
             break;
-	case EXCP_INTERRUPT:
-	  /* just indicate that signals should be handled asap */
-	  break;
+        case EXCP_INTERRUPT:
+            /* just indicate that signals should be handled asap */
+            break;
         case EXCP_BREAK:
             /* Return address is 4 bytes after the call.  */
             env->regs[14] += 4;
             env->sregs[SR_PC] = env->regs[14];
-            ret = do_syscall(env, 
+            ret = do_syscall(env,
                              env->regs[12], 
                              env->regs[5], 
                              env->regs[6], 
@@ -2923,7 +2923,11 @@ void cpu_loop(CPUMBState *env)
                              env->regs[9], 
                              env->regs[10],
                              0, 0);
-            env->regs[3] = ret;
+            if (ret == -TARGET_ERESTARTSYS) {
+                env->sregs[SR_PC] -= 4;
+            } else if (ret != -TARGET_QEMU_ESIGRETURN) {
+                env->regs[3] = ret;
+            }
             break;
         case EXCP_HW_EXCP:
             env->regs[17] = env->sregs[SR_PC] + 4;
