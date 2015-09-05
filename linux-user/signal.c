@@ -1401,7 +1401,7 @@ long do_rt_sigreturn(CPUARMState *env)
     }
 
     unlock_user_struct(frame, frame_addr, 0);
-    return env->xregs[0];
+    return -TARGET_QEMU_ESIGRETURN;
 
  badframe:
     unlock_user_struct(frame, frame_addr, 0);
@@ -1907,7 +1907,7 @@ static long do_sigreturn_v1(CPUARMState *env)
         send_sig(SIGTRAP, current, 1);
 #endif
     unlock_user_struct(frame, frame_addr, 0);
-    return env->regs[0];
+    return -TARGET_QEMU_ESIGRETURN;
 
 badframe:
     force_sig(TARGET_SIGSEGV /* , current */);
@@ -2032,7 +2032,7 @@ static long do_sigreturn_v2(CPUARMState *env)
     }
 
     unlock_user_struct(frame, frame_addr, 0);
-    return env->regs[0];
+    return -TARGET_QEMU_ESIGRETURN;
 
 badframe:
     unlock_user_struct(frame, frame_addr, 0);
@@ -2085,7 +2085,7 @@ static long do_rt_sigreturn_v1(CPUARMState *env)
         send_sig(SIGTRAP, current, 1);
 #endif
     unlock_user_struct(frame, frame_addr, 0);
-    return env->regs[0];
+    return -TARGET_QEMU_ESIGRETURN;
 
 badframe:
     unlock_user_struct(frame, frame_addr, 0);
@@ -2117,7 +2117,7 @@ static long do_rt_sigreturn_v2(CPUARMState *env)
     }
 
     unlock_user_struct(frame, frame_addr, 0);
-    return env->regs[0];
+    return -TARGET_QEMU_ESIGRETURN;
 
 badframe:
     unlock_user_struct(frame, frame_addr, 0);
