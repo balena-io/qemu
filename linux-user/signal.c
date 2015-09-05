@@ -196,53 +196,66 @@ void target_to_host_old_sigset(sigset_t *sigset,
     target_to_host_sigset(sigset, &d);
 }
 
+int block_signals(void)
+{
+    TaskState *ts = (TaskState *)thread_cpu->opaque;
+    sigset_t set;
+    int pending;
+
+    sigfillset(&set);
+    sigdelset(&set, SIGSEGV);
+    sigdelset(&set, SIGBUS);
+    sigprocmask(SIG_SETMASK, &set, 0);
+
+    pending = ts->signal_pending;
+    pending |= 2;
+    ts->signal_pending = pending;
+
+#ifdef TARGET_USE_ERESTARTSYS
+    return pending & 1;
+#endif
+    return 0;
+}
+
 /* Wrapper for sigprocmask function
  * Emulates a sigprocmask in a safe way for the guest. Note that set and oldset
- * are host signal set, not guest ones. This wraps the sigprocmask host calls
- * that should be protected (calls originated from guest)
+ * are host signal set, not guest ones.
  */
 int do_sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
 {
-    int ret;
-    sigset_t val;
-    sigset_t *temp = NULL;
-    CPUState *cpu = thread_cpu;
-    TaskState *ts = (TaskState *)cpu->opaque;
-    bool segv_was_blocked = ts->sigsegv_blocked;
+    TaskState *ts = (TaskState *)thread_cpu->opaque;
+
+    if (oldset) {
+        *oldset = ts->signal_mask;
+    }
 
     if (set) {
-        bool has_sigsegv = sigismember(set, SIGSEGV);
-        val = *set;
-        temp = &val;
+        int i;
 
-        sigdelset(temp, SIGSEGV);
+        if (block_signals()) {
+            return -TARGET_ERESTARTSYS;
+        }
 
         switch (how) {
         case SIG_BLOCK:
-            if (has_sigsegv) {
-                ts->sigsegv_blocked = true;
-            }
+            sigorset(&ts->signal_mask, &ts->signal_mask, set);
             break;
         case SIG_UNBLOCK:
-            if (has_sigsegv) {
-                ts->sigsegv_blocked = false;
+            for (i = 0; i != NSIG; ++i) {
+                if (sigismember(set, i)) {
+                    sigdelset(&ts->signal_mask, i);
+                }
             }
             break;
         case SIG_SETMASK:
-            ts->sigsegv_blocked = has_sigsegv;
+            ts->signal_mask = *set;
             break;
         default:
             g_assert_not_reached();
         }
+
     }
-
-    ret = sigprocmask(how, temp, oldset);
-
-    if (oldset && segv_was_blocked) {
-        sigaddset(oldset, SIGSEGV);
-    }
-
-    return ret;
+    return 0;
 }
 
 /* siginfo conversion */
@@ -373,6 +386,7 @@ static int core_dump_signal(int sig)
 
 void signal_init(void)
 {
+    TaskState *ts = (TaskState *)thread_cpu->opaque;
     struct sigaction act;
     struct sigaction oact;
     int i, j;
@@ -387,6 +401,9 @@ void signal_init(void)
         j = host_to_target_signal_table[i];
         target_to_host_signal_table[j] = i;
     }
+
+    /* Set the signal mask from the host mask. */
+    sigprocmask(0, 0, &ts->signal_mask);
 
     /* set all host signal handlers. ALL signals are blocked during
        the handlers to serialize them. */
@@ -507,7 +524,7 @@ int queue_signal(CPUArchState *env, int sig, target_siginfo_t *info)
     queue = gdb_queuesig ();
     handler = sigact_table[sig - 1]._sa_handler;
 
-    if (ts->sigsegv_blocked && sig == TARGET_SIGSEGV) {
+    if (sig == TARGET_SIGSEGV && sigismember(&ts->signal_mask, SIGSEGV)) {
         /* Guest has blocked SIGSEGV but we got one anyway. Assume this
          * is a forced SIGSEGV (ie one the kernel handles via force_sig_info
          * because it got a real MMU fault). A blocked SIGSEGV in that
@@ -604,6 +621,11 @@ static void host_signal_handler(int host_signum, siginfo_t *info,
 
     host_to_target_siginfo_noswap(&tinfo, info);
     if (queue_signal(env, sig, &tinfo) == 1) {
+        /* Block host signals until target signal handler entered */
+        sigfillset(&uc->uc_sigmask);
+        sigdelset(&uc->uc_sigmask, SIGSEGV);
+        sigdelset(&uc->uc_sigmask, SIGBUS);
+
         /* interrupt the virtual CPU as soon as possible */
         cpu_exit(thread_cpu);
     }
@@ -5778,26 +5800,39 @@ void process_pending_signals(CPUArchState *cpu_env)
     CPUState *cpu = ENV_GET_CPU(cpu_env);
     int sig;
     abi_ulong handler;
-    sigset_t set, old_set;
+    sigset_t set;
     target_sigset_t target_old_set;
     struct emulated_sigtable *k;
     struct target_sigaction *sa;
     struct sigqueue *q;
     TaskState *ts = cpu->opaque;
 
-    if (!ts->signal_pending)
+restart:
+    if (!ts->signal_pending) {
         return;
+    }
 
     /* FIXME: This is not threadsafe.  */
+    sigfillset(&set);
+    sigprocmask(SIG_SETMASK, &set, 0);
+
+ next_signal:
     k = ts->sigtab;
     for(sig = 1; sig <= TARGET_NSIG; sig++) {
-        if (k->pending)
+        if (k->pending && (
+                    !sigismember(&ts->signal_mask, target_to_host_signal_table[sig])
+                    || sig == TARGET_SIGSEGV)) {
             goto handle_signal;
+        }
         k++;
     }
-    /* if no signal is pending, just return */
+    /* if no signal is pending, unblock signals and restart */
     ts->signal_pending = 0;
-    return;
+    set = ts->signal_mask;
+    sigdelset(&set, SIGSEGV);
+    sigdelset(&set, SIGBUS);
+    sigprocmask(SIG_SETMASK, &set, 0);
+    goto restart; /* Another signal? */
 
  handle_signal:
 #ifdef DEBUG_SIGNAL
@@ -5818,7 +5853,7 @@ void process_pending_signals(CPUArchState *cpu_env)
         handler = sa->_sa_handler;
     }
 
-    if (ts->sigsegv_blocked && sig == TARGET_SIGSEGV) {
+    if (sig == TARGET_SIGSEGV && sigismember(&ts->signal_mask, SIGSEGV)) {
         /* Guest has blocked SIGSEGV but we got one anyway. Assume this
          * is a forced SIGSEGV (ie one the kernel handles via force_sig_info
          * because it got a real MMU fault), and treat as if default handler.
@@ -5848,11 +5883,12 @@ void process_pending_signals(CPUArchState *cpu_env)
         if (!(sa->sa_flags & TARGET_SA_NODEFER))
             sigaddset(&set, target_to_host_signal(sig));
 
-        /* block signals in the handler using Linux */
-        do_sigprocmask(SIG_BLOCK, &set, &old_set);
         /* save the previous blocked signal state to restore it at the
            end of the signal execution (see do_sigreturn) */
-        host_to_target_sigset_internal(&target_old_set, &old_set);
+        host_to_target_sigset_internal(&target_old_set, &ts->signal_mask);
+
+        /* block signals in the handler */
+        sigorset(&ts->signal_mask, &ts->signal_mask, &set);
 
         /* if the CPU is in VM86 mode, we restore the 32 bit values */
 #if defined(TARGET_I386) && !defined(TARGET_X86_64)
@@ -5873,9 +5909,11 @@ void process_pending_signals(CPUArchState *cpu_env)
         else
             setup_frame(sig, sa, &target_old_set, cpu_env);
 #endif
-	if (sa->sa_flags & TARGET_SA_RESETHAND)
+        if (sa->sa_flags & TARGET_SA_RESETHAND)
             sa->_sa_handler = TARGET_SIG_DFL;
     }
     if (q != &k->info)
         free_sigqueue(cpu_env, q);
+
+    goto next_signal;
 }
