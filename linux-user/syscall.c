@@ -707,6 +707,10 @@ static type safe_##name (type1 arg1, type2 arg2, type3 arg3, type4 arg4, \
 
 #endif
 
+safe_syscall3(ssize_t, read, int, fd, void *, buff, size_t, count)
+safe_syscall3(ssize_t, write, int, fd, const void *, buff, size_t, count)
+
+
 static inline int host_to_target_sock_type(int host_type)
 {
     int target_type;
@@ -5840,14 +5844,14 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
         else {
             if (!(p = lock_user(VERIFY_WRITE, arg2, arg3, 0)))
                 goto efault;
-            ret = get_errno(read(arg1, p, arg3));
+            ret = safe_read(arg1, p, arg3);
             unlock_user(p, arg2, ret);
         }
         break;
     case TARGET_NR_write:
         if (!(p = lock_user(VERIFY_READ, arg2, arg3, 1)))
             goto efault;
-        ret = get_errno(write(arg1, p, arg3));
+        ret = safe_write(arg1, p, arg3);
         unlock_user(p, arg2, 0);
         break;
 #ifdef TARGET_NR_open
