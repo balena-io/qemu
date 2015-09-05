@@ -6053,9 +6053,9 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
     case TARGET_NR_open:
         if (!(p = lock_user_string(arg1)))
             goto efault;
-        ret = get_errno(do_openat(cpu_env, AT_FDCWD, p,
-                                  target_to_host_bitmask(arg2, fcntl_flags_tbl),
-                                  arg3));
+        ret = do_openat(cpu_env, AT_FDCWD, p,
+                        target_to_host_bitmask(arg2, fcntl_flags_tbl),
+                        arg3);
         fd_trans_unregister(ret);
         unlock_user(p, arg1, 0);
         break;
@@ -6063,9 +6063,9 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
     case TARGET_NR_openat:
         if (!(p = lock_user_string(arg2)))
             goto efault;
-        ret = get_errno(do_openat(cpu_env, arg1, p,
-                                  target_to_host_bitmask(arg3, fcntl_flags_tbl),
-                                  arg4));
+        ret = do_openat(cpu_env, arg1, p,
+                        target_to_host_bitmask(arg3, fcntl_flags_tbl),
+                        arg4);
         fd_trans_unregister(ret);
         unlock_user(p, arg2, 0);
         break;
