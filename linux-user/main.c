@@ -832,15 +832,20 @@ void cpu_loop(CPUARMState *env)
                             break;
                         }
                     } else {
-                        env->regs[0] = do_syscall(env,
-                                                  n,
-                                                  env->regs[0],
-                                                  env->regs[1],
-                                                  env->regs[2],
-                                                  env->regs[3],
-                                                  env->regs[4],
-                                                  env->regs[5],
-                                                  0, 0);
+                        abi_ulong ret = do_syscall(env,
+                                                   n,
+                                                   env->regs[0],
+                                                   env->regs[1],
+                                                   env->regs[2],
+                                                   env->regs[3],
+                                                   env->regs[4],
+                                                   env->regs[5],
+                                                   0, 0);
+                        if (ret == -TARGET_ERESTARTSYS) {
+                            env->regs[15] -= env->thumb ? 2 : 4;
+                        } else if (ret != -TARGET_QEMU_ESIGRETURN) {
+                            env->regs[0] = ret;
+                        }
                     }
                 } else {
                     goto error;
@@ -1020,6 +1025,7 @@ void cpu_loop(CPUARMState *env)
 {
     CPUState *cs = CPU(arm_env_get_cpu(env));
     int trapnr, sig;
+    abi_long ret;
     target_siginfo_t info;
 
     for (;;) {
@@ -1029,15 +1035,20 @@ void cpu_loop(CPUARMState *env)
 
         switch (trapnr) {
         case EXCP_SWI:
-            env->xregs[0] = do_syscall(env,
-                                       env->xregs[8],
-                                       env->xregs[0],
-                                       env->xregs[1],
-                                       env->xregs[2],
-                                       env->xregs[3],
-                                       env->xregs[4],
-                                       env->xregs[5],
-                                       0, 0);
+            ret = do_syscall(env,
+                             env->xregs[8],
+                             env->xregs[0],
+                             env->xregs[1],
+                             env->xregs[2],
+                             env->xregs[3],
+                             env->xregs[4],
+                             env->xregs[5],
+                             0, 0);
+            if (ret == -TARGET_ERESTARTSYS) {
+                env->pc -= 4;
+            } else if (ret != -TARGET_QEMU_ESIGRETURN) {
+                env->xregs[0] = ret;
+            }
             break;
         case EXCP_INTERRUPT:
             /* just indicate that signals should be handled asap */
