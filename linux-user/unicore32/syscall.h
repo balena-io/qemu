@@ -58,3 +58,5 @@ struct target_pt_regs {
 #define TARGET_MLOCKALL_MCL_FUTURE  2
 
 #endif /* __UC32_SYSCALL_H__ */
+
+#define TARGET_USE_ERESTARTSYS 1
