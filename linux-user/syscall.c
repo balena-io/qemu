@@ -5868,6 +5868,16 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
     struct statfs stfs;
     void *p;
 
+#if defined(DEBUG_ERESTARTSYS) && defined(TARGET_USE_ERESTARTSYS)
+    {
+        static int flag;
+        flag = !flag;
+        if (flag) {
+            return -TARGET_ERESTARTSYS;
+        }
+    }
+#endif
+
 #ifdef DEBUG
     gemu_log("syscall %d", num);
 #endif
