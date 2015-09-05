@@ -5490,6 +5490,19 @@ if test "$gcov" = "yes" ; then
   echo "GCOV=$gcov_tool" >> $config_host_mak
 fi
 
+# Which safe_syscall_base implmentation?
+if test "$linux" = "yes" ; then
+  case "$cpu" in
+  x86_64)
+    echo "SAFE_SYSCALL_BASE=safe_syscall/x86_64.o" >> $config_host_mak
+    echo "CONFIG_SAFE_SYSCALL=y" >> $config_host_mak
+    ;;
+  *)
+    echo "SAFE_SYSCALL_BASE=" >> $config_host_mak
+    ;;
+  esac
+fi
+
 # use included Linux headers
 if test "$linux" = "yes" ; then
   mkdir -p linux-headers
