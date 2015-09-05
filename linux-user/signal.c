@@ -3211,13 +3211,12 @@ static void setup_sigcontext(struct target_sigcontext *sc,
     __put_user(mask, &sc->oldmask);
 }
 
-static void restore_sigcontext(CPUSH4State *regs, struct target_sigcontext *sc,
-                               target_ulong *r0_p)
+static void restore_sigcontext(CPUSH4State *regs, struct target_sigcontext *sc)
 {
     int i;
 
 #define COPY(x)         __get_user(regs->x, &sc->sc_##x)
-    COPY(gregs[1]);
+    COPY(gregs[0]); COPY(gregs[1]);
     COPY(gregs[2]); COPY(gregs[3]);
     COPY(gregs[4]); COPY(gregs[5]);
     COPY(gregs[6]); COPY(gregs[7]);
@@ -3237,7 +3236,6 @@ static void restore_sigcontext(CPUSH4State *regs, struct target_sigcontext *sc,
     __get_user(regs->fpul, &sc->sc_fpul);
 
     regs->tra = -1;         /* disable syscall checks */
-    __get_user(*r0_p, &sc->sc_gregs[0]);
 }
 
 static void setup_frame(int sig, struct target_sigaction *ka,
@@ -3356,7 +3354,6 @@ long do_sigreturn(CPUSH4State *regs)
     abi_ulong frame_addr;
     sigset_t blocked;
     target_sigset_t target_set;
-    target_ulong r0;
     int i;
     int err = 0;
 
@@ -3379,10 +3376,10 @@ long do_sigreturn(CPUSH4State *regs)
     target_to_host_sigset_internal(&blocked, &target_set);
     do_sigprocmask(SIG_SETMASK, &blocked, NULL);
 
-    restore_sigcontext(regs, &frame->sc, &r0);
+    restore_sigcontext(regs, &frame->sc);
 
     unlock_user_struct(frame, frame_addr, 0);
-    return r0;
+    return -TARGET_QEMU_ESIGRETURN;
 
 badframe:
     unlock_user_struct(frame, frame_addr, 0);
@@ -3395,7 +3392,6 @@ long do_rt_sigreturn(CPUSH4State *regs)
     struct target_rt_sigframe *frame;
     abi_ulong frame_addr;
     sigset_t blocked;
-    target_ulong r0;
 
 #if defined(DEBUG_SIGNAL)
     fprintf(stderr, "do_rt_sigreturn\n");
@@ -3408,7 +3404,7 @@ long do_rt_sigreturn(CPUSH4State *regs)
     target_to_host_sigset(&blocked, &frame->uc.tuc_sigmask);
     do_sigprocmask(SIG_SETMASK, &blocked, NULL);
 
-    restore_sigcontext(regs, &frame->uc.tuc_mcontext, &r0);
+    restore_sigcontext(regs, &frame->uc.tuc_mcontext);
 
     if (do_sigaltstack(frame_addr +
                        offsetof(struct target_rt_sigframe, uc.tuc_stack),
@@ -3417,7 +3413,7 @@ long do_rt_sigreturn(CPUSH4State *regs)
     }
 
     unlock_user_struct(frame, frame_addr, 0);
-    return r0;
+    return -TARGET_QEMU_ESIGRETURN;
 
 badframe:
     unlock_user_struct(frame, frame_addr, 0);
