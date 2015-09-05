@@ -125,14 +125,17 @@ typedef struct TaskState {
 #endif
     uint32_t stack_base;
     int used; /* non zero if used */
-    bool sigsegv_blocked; /* SIGSEGV blocked by guest */
     struct image_info *info;
     struct linux_binprm *bprm;
 
     struct emulated_sigtable sigtab[TARGET_NSIG];
     struct sigqueue sigqueue_table[MAX_SIGQUEUE_SIZE]; /* siginfo queue */
     struct sigqueue *first_free; /* first free siginfo queue entry */
-    int signal_pending; /* non zero if a signal may be pending */
+    sigset_t signal_mask;
+
+    /* non zero if host signals blocked, bit 1 set if signal pending */
+    volatile int signal_pending;
+
 } __attribute__((aligned(16))) TaskState;
 
 extern char *exec_path;
@@ -246,6 +249,7 @@ long do_sigreturn(CPUArchState *env);
 long do_rt_sigreturn(CPUArchState *env);
 abi_long do_sigaltstack(abi_ulong uss_addr, abi_ulong uoss_addr, abi_ulong sp);
 int do_sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
+int block_signals(void); /* Returns non zero if signal pending */
 
 #ifdef TARGET_I386
 /* vm86.c */
