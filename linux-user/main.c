@@ -19,6 +19,7 @@
 #include "qemu/osdep.h"
 #include "qemu/units.h"
 #include "qemu-version.h"
+#include <sys/mman.h>
 #include <sys/syscall.h>
 #include <sys/resource.h>
 
@@ -39,6 +40,8 @@
 #include "cpu_loop-common.h"
 
 char *exec_path;
+
+extern unsigned long int getauxval (unsigned long int __type);
 
 int singlestep;
 static const char *filename;
@@ -84,6 +87,7 @@ static void usage(int exitcode);
 
 static const char *interp_prefix = CONFIG_QEMU_INTERP_PREFIX;
 const char *qemu_uname_release;
+const char *qemu_execve_path;
 
 /* XXX: on x86 MAP_GROWSDOWN only works if ESP <= address + 32, so
    we allocate a bigger stack. Need a better solution, for example
@@ -328,6 +332,39 @@ static void handle_arg_guest_base(const char *arg)
     have_guest_base = 1;
 }
 
+static void handle_arg_execve(const char *arg)
+{
+    const char *execfn;
+    char buf[PATH_MAX];
+    char *ret;
+    int len;
+
+    /* try getauxval() */
+    execfn = (const char *) getauxval(AT_EXECFN);
+
+    if (execfn != 0) {
+        ret = realpath(execfn, buf);
+
+        if (ret != NULL) {
+            qemu_execve_path = strdup(buf);
+            return;
+        }
+    }
+
+    /* try /proc/self/exe */
+    len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+
+    if (len != -1) {
+        buf[len] = '\0';
+        qemu_execve_path = strdup(buf);
+        return;
+    }
+
+    fprintf(stderr, "qemu_execve: unable to determine intepreter's path\n");
+    exit(EXIT_FAILURE);
+}
+
+
 static void handle_arg_reserved_va(const char *arg)
 {
     char *p;
@@ -417,6 +454,8 @@ static const struct qemu_argument arg_table[] = {
      "uname",      "set qemu uname release string to 'uname'"},
     {"B",          "QEMU_GUEST_BASE",  true,  handle_arg_guest_base,
      "address",    "set guest_base address to 'address'"},
+    {"execve",     "QEMU_EXECVE",      false, handle_arg_execve,
+     "",           "use this interpreter when a process calls execve()"},
     {"R",          "QEMU_RESERVED_VA", true,  handle_arg_reserved_va,
      "size",       "reserve 'size' bytes for guest virtual address space"},
     {"d",          "QEMU_LOG",         true,  handle_arg_log,
