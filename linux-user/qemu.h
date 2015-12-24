@@ -159,6 +159,7 @@ typedef struct TaskState {
     uint64_t start_boottime;
 } TaskState;
 
+extern const char *qemu_execve_path;
 abi_long do_brk(abi_ulong new_brk);
 
 /* user access */
