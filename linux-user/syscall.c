@@ -763,6 +763,7 @@ safe_syscall4(pid_t, wait4, pid_t, pid, int *, status, int, options, \
 safe_syscall4(int, waitid, idtype_t, idtype, id_t, id, siginfo_t *, infop, \
     int, options)
 safe_syscall3(int, execve, const char *, filename, char **, argv, char **, envp)
+safe_syscall5(int, select, int, nfds, fd_set *, readfds, fd_set *, writefds, fd_set *, exceptfds, struct timeval *, timeout)
 
 
 static inline int host_to_target_sock_type(int host_type)
@@ -1199,7 +1200,7 @@ static abi_long do_select(int n,
         tv_ptr = NULL;
     }
 
-    ret = get_errno(select(n, rfds_ptr, wfds_ptr, efds_ptr, tv_ptr));
+    ret = safe_select(n, rfds_ptr, wfds_ptr, efds_ptr, tv_ptr);
 
     if (!is_error(ret)) {
         if (rfd_addr && copy_to_user_fdset(rfd_addr, &rfds, n))
