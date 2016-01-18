@@ -754,6 +754,16 @@ safe_syscall4(int, msgsnd, int, msqid, const void *, msgp, size_t, msgsz, \
 safe_syscall5(ssize_t, msgrcv, int, msqid, void *, msgp, size_t, msgsz, \
     long, msgtyp, int, msgflg);
 
+/* missing syscalls
+ * fcntl
+ * ioctl
+ * nanosleep
+ * poll
+ * semget
+ * semctl
+ * semop
+ */
+
 static inline int host_to_target_sock_type(int host_type)
 {
     int target_type;
