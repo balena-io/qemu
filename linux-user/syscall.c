@@ -793,6 +793,13 @@ safe_syscall3(int, accept, int, sockfd, struct sockaddr *, addr, \
 safe_syscall4(int, accept4, int, sockfd, struct sockaddr *, addr, \
     socklen_t *, addrlen, int, flags);
 #endif
+safe_syscall6(ssize_t, recvfrom, int, sockfd, void *, buf, size_t, len, \
+    int, flags, struct sockaddr *, src_addr, socklen_t *, addrlen);
+safe_syscall3(ssize_t, recvmsg, int, sockfd, struct msghdr *, msg, int, flags);
+safe_syscall6(ssize_t, sendto, int, sockfd, const void *, buf, size_t, len, \
+    int, flags, const struct sockaddr *, dest_addr, socklen_t, addrlen);
+safe_syscall3(ssize_t, sendmsg, int, sockfd, const struct msghdr *, msg, \
+    int, flags);
 
 static inline int host_to_target_sock_type(int host_type)
 {
@@ -2363,9 +2370,9 @@ static abi_long do_sendrecvmsg_locked(int fd, struct target_msghdr *msgp,
     if (send) {
         ret = target_to_host_cmsg(&msg, msgp);
         if (ret == 0)
-            ret = get_errno(sendmsg(fd, &msg, flags));
+            ret = safe_sendmsg(fd, &msg, flags);
     } else {
-        ret = get_errno(recvmsg(fd, &msg, flags));
+        ret = safe_recvmsg(fd, &msg, flags);
         if (!is_error(ret)) {
             len = ret;
             ret = host_to_target_cmsg(msgp, &msg);
@@ -2602,7 +2609,7 @@ static abi_long do_sendto(int fd, abi_ulong msg, size_t len, int flags,
             unlock_user(host_msg, msg, 0);
             return ret;
         }
-        ret = get_errno(sendto(fd, host_msg, len, flags, addr, addrlen));
+        ret = safe_sendto(fd, host_msg, len, flags, addr, addrlen);
     } else {
         ret = get_errno(send(fd, host_msg, len, flags));
     }
@@ -2633,7 +2640,7 @@ static abi_long do_recvfrom(int fd, abi_ulong msg, size_t len, int flags,
             goto fail;
         }
         addr = alloca(addrlen);
-        ret = get_errno(recvfrom(fd, host_msg, len, flags, addr, &addrlen));
+        ret = safe_recvfrom(fd, host_msg, len, flags, addr, &addrlen);
     } else {
         addr = NULL; /* To keep compiler quiet.  */
         ret = get_errno(qemu_recv(fd, host_msg, len, flags));
