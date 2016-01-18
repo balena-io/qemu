@@ -755,7 +755,9 @@ static type safe_##name (type1 arg1, type2 arg2, type3 arg3, type4 arg4, \
 #endif
 
 safe_syscall3(ssize_t, read, int, fd, void *, buff, size_t, count)
+safe_syscall3(ssize_t, readv, int, fd, const struct iovec *, iov, int, iovcnt);
 safe_syscall3(ssize_t, write, int, fd, const void *, buff, size_t, count)
+safe_syscall3(ssize_t, writev, int, fd, const struct iovec *, iov, int, iovcnt);
 safe_syscall4(int, openat, int, dirfd, const char *, pathname, \
     int, flags, mode_t, mode)
 safe_syscall4(pid_t, wait4, pid_t, pid, int *, status, int, options, \
@@ -8318,7 +8320,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
         {
             struct iovec *vec = lock_iovec(VERIFY_WRITE, arg2, arg3, 0);
             if (vec != NULL) {
-                ret = get_errno(readv(arg1, vec, arg3));
+                ret = safe_readv(arg1, vec, arg3);
                 unlock_iovec(vec, arg2, arg3, 1);
             } else {
                 ret = -host_to_target_errno(errno);
@@ -8329,7 +8331,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
         {
             struct iovec *vec = lock_iovec(VERIFY_READ, arg2, arg3, 1);
             if (vec != NULL) {
-                ret = get_errno(writev(arg1, vec, arg3));
+                ret = safe_writev(arg1, vec, arg3);
                 unlock_iovec(vec, arg2, arg3, 0);
             } else {
                 ret = -host_to_target_errno(errno);
