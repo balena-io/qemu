@@ -742,6 +742,18 @@ safe_syscall6(ssize_t, sendto, int, sockfd, const void *, buf, size_t, len, \
 safe_syscall3(ssize_t, sendmsg, int, sockfd, const struct msghdr *, msg, \
     int, flags);
 
+/* message queue syscalls */
+#if defined(TARGET_NR_mq_open) && defined(__NR_mq_open)
+#include <mqueue.h>
+
+safe_syscall4(mqd_t, mq_open, const char *, name, int, oflag, mode_t, mode, \
+    struct mq_attr *, attr);
+#endif
+safe_syscall4(int, msgsnd, int, msqid, const void *, msgp, size_t, msgsz, \
+    int, msgflg);
+safe_syscall5(ssize_t, msgrcv, int, msqid, void *, msgp, size_t, msgsz, \
+    long, msgtyp, int, msgflg);
+
 static inline int host_to_target_sock_type(int host_type)
 {
     int target_type;
@@ -1103,8 +1115,6 @@ static inline abi_long copy_from_user_timezone(struct timezone *tz,
 }
 
 #if defined(TARGET_NR_mq_open) && defined(__NR_mq_open)
-#include <mqueue.h>
-
 static inline abi_long copy_from_user_mq_attr(struct mq_attr *attr,
                                               abi_ulong target_mq_attr_addr)
 {
@@ -3130,8 +3140,7 @@ static inline abi_long do_msgsnd(int msqid, abi_long msgp,
     }
     host_mb->mtype = (abi_long) tswapal(target_mb->mtype);
     memcpy(host_mb->mtext, target_mb->mtext, msgsz);
-    ret = get_errno(msgsnd(msqid, host_mb, msgsz, msgflg));
-    free(host_mb);
+    ret = safe_msgsnd(msqid, host_mb, msgsz, msgflg);
     unlock_user_struct(target_mb, msgp, 0);
 
     return ret;
@@ -3150,7 +3159,7 @@ static inline abi_long do_msgrcv(int msqid, abi_long msgp,
         return -TARGET_EFAULT;
 
     host_mb = g_malloc(msgsz+sizeof(long));
-    ret = get_errno(msgrcv(msqid, host_mb, msgsz, msgtyp, msgflg));
+    ret = safe_msgrcv(msqid, host_mb, msgsz, msgtyp, msgflg);
 
     if (ret > 0) {
         abi_ulong target_mtext_addr = msgp + sizeof(abi_ulong);
@@ -9657,7 +9666,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
             } else {
                 attrp = 0;
             }
-            ret = get_errno(mq_open(p, arg2, arg3, attrp));
+            ret = safe_mq_open(p, arg2, arg3, attrp);
             unlock_user (p, arg1, 0);
         }
         break;
