@@ -379,8 +379,6 @@ _syscall5(int, sys_ppoll, struct pollfd *, fds, nfds_t, nfds,
 # define __NR_pselect6 -1
 #endif
 #define __NR_sys_pselect6 __NR_pselect6
-_syscall6(int, sys_pselect6, int, nfds, fd_set *, readfds, fd_set *, writefds,
-          fd_set *, exceptfds, struct timespec *, timeout, void *, sig);
 #endif
 
 #if defined(TARGET_NR_prlimit64)
@@ -695,18 +693,37 @@ static type safe_##name (type1 arg1, type2 arg2, type3 arg3, type4 arg4, \
 
 #endif
 
+/* io syscalls */
+safe_syscall4(int, openat, int, dirfd, const char *, pathname, \
+    int, flags, mode_t, mode)
+#ifdef TARGET_NR_creat /* not on alpha */
+safe_syscall2(int, creat, const char *, pathname, mode_t, mode);
+#endif
 safe_syscall3(ssize_t, read, int, fd, void *, buff, size_t, count)
 safe_syscall3(ssize_t, readv, int, fd, const struct iovec *, iov, int, iovcnt);
 safe_syscall3(ssize_t, write, int, fd, const void *, buff, size_t, count)
 safe_syscall3(ssize_t, writev, int, fd, const struct iovec *, iov, int, iovcnt);
-safe_syscall4(int, openat, int, dirfd, const char *, pathname, \
-    int, flags, mode_t, mode)
-safe_syscall4(pid_t, wait4, pid_t, pid, int *, status, int, options, \
-    struct rusage *, rusage)
+safe_syscall1(int, fsync, int, fd);
+#if defined(TARGET_NR_fdatasync) /* Not on alpha (osf_datasync ?) */
+safe_syscall1(int, fdatasync, int, fd);
+#endif
+safe_syscall1(int, close, int, fd);
+#ifdef TARGET_NR_msync
+safe_syscall3(int, msync, void *, addr, size_t, length, int, flags);
+#endif
+safe_syscall5(int, select, int, nfds, fd_set *, readfds, fd_set *, writefds, \
+    fd_set *, exceptfds, struct timeval *, timeout);
+#if defined(TARGET_NR_pselect6)
+safe_syscall6(int, sys_pselect6, int, nfds, fd_set *, readfds, fd_set *, writefds, \
+    fd_set *, exceptfds, const struct timespec *, timeout, void *, sig);
+#endif
+
+/* process syscalls */
 safe_syscall4(int, waitid, idtype_t, idtype, id_t, id, siginfo_t *, infop, \
     int, options)
+safe_syscall4(pid_t, wait4, pid_t, pid, int *, status, int, options, \
+    struct rusage *, rusage)
 safe_syscall3(int, execve, const char *, filename, char **, argv, char **, envp)
-safe_syscall5(int, select, int, nfds, fd_set *, readfds, fd_set *, writefds, fd_set *, exceptfds, struct timeval *, timeout)
 
 
 static inline int host_to_target_sock_type(int host_type)
@@ -5891,7 +5908,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
         break;
 #endif
     case TARGET_NR_close:
-        ret = get_errno(close(arg1));
+        ret = safe_close(arg1);
         break;
     case TARGET_NR_brk:
         ret = do_brk(arg1);
@@ -5931,7 +5948,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
     case TARGET_NR_creat:
         if (!(p = lock_user_string(arg1)))
             goto efault;
-        ret = get_errno(creat(p, arg2));
+        ret = safe_creat(p, arg2);
         unlock_user(p, arg1, 0);
         break;
 #endif
@@ -7068,8 +7085,8 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
                 sig_ptr = NULL;
             }
 
-            ret = get_errno(sys_pselect6(n, rfds_ptr, wfds_ptr, efds_ptr,
-                                         ts_ptr, sig_ptr));
+            ret = safe_sys_pselect6(n, rfds_ptr, wfds_ptr, efds_ptr, ts_ptr,
+                                         sig_ptr);
 
             if (!is_error(ret)) {
                 if (rfd_addr && copy_to_user_fdset(rfd_addr, &rfds, n))
@@ -7267,7 +7284,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
         /* ??? msync/mlock/munlock are broken for softmmu.  */
 #ifdef TARGET_NR_msync
     case TARGET_NR_msync:
-        ret = get_errno(msync(g2h(arg1), arg2, arg3));
+        ret = safe_msync(g2h(arg1), arg2, arg3);
         break;
 #endif
 #ifdef TARGET_NR_mlock
@@ -7739,7 +7756,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
         break;
 #endif
     case TARGET_NR_fsync:
-        ret = get_errno(fsync(arg1));
+        ret = safe_fsync(arg1);
         break;
     case TARGET_NR_clone:
         /* Linux manages to have three different orderings for its
@@ -8127,7 +8144,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
         break;
 #if defined(TARGET_NR_fdatasync) /* Not on alpha (osf_datasync ?) */
     case TARGET_NR_fdatasync:
-        ret = get_errno(fdatasync(arg1));
+        ret = safe_fdatasync(arg1);
         break;
 #endif
 #ifdef TARGET_NR__sysctl
