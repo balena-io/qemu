@@ -784,6 +784,15 @@ safe_syscall4(pid_t, wait4, pid_t, pid, int *, status, int, options, \
     struct rusage *, rusage)
 safe_syscall3(int, execve, const char *, filename, char **, argv, char **, envp)
 
+/* network syscalls */
+#ifndef CONFIG_ACCEPT4
+safe_syscall3(int, accept, int, sockfd, struct sockaddr *, addr, \
+    socklen_t *, addrlen);
+#endif
+#ifdef CONFIG_ACCEPT4
+safe_syscall4(int, accept4, int, sockfd, struct sockaddr *, addr, \
+    socklen_t *, addrlen, int, flags);
+#endif
 
 static inline int host_to_target_sock_type(int host_type)
 {
@@ -2454,7 +2463,7 @@ static inline int accept4(int sockfd, struct sockaddr *addr,
                           socklen_t *addrlen, int flags)
 {
     assert(flags == 0);
-    return accept(sockfd, addr, addrlen);
+    return safe_accept(sockfd, addr, addrlen);
 }
 #endif
 
@@ -2470,7 +2479,7 @@ static abi_long do_accept4(int fd, abi_ulong target_addr,
     host_flags = target_to_host_bitmask(flags, fcntl_flags_tbl);
 
     if (target_addr == 0) {
-        return get_errno(accept4(fd, NULL, NULL, host_flags));
+        return safe_accept4(fd, NULL, NULL, host_flags);
     }
 
     /* linux returns EINVAL if addrlen pointer is invalid */
@@ -2486,7 +2495,7 @@ static abi_long do_accept4(int fd, abi_ulong target_addr,
 
     addr = alloca(addrlen);
 
-    ret = get_errno(accept4(fd, addr, &addrlen, host_flags));
+    ret = safe_accept4(fd, addr, &addrlen, host_flags);
     if (!is_error(ret)) {
         host_to_target_sockaddr(target_addr, addr, addrlen);
         if (put_user_u32(addrlen, target_addrlen_addr))
