@@ -2427,6 +2427,14 @@ fi
 
 
 ##########################################
+# getifaddrs (for tests/test-io-channel-socket )
+
+have_ifaddrs_h=yes
+if ! check_include "ifaddrs.h" ; then
+  have_ifaddrs_h=no
+fi
+
+##########################################
 # VTE probe
 
 if test "$vte" != "no"; then
@@ -4758,7 +4766,11 @@ echo "GTK GL support    $gtk_gl"
 echo "GNUTLS support    $gnutls"
 echo "GNUTLS hash       $gnutls_hash"
 echo "libgcrypt         $gcrypt"
-echo "nettle            $nettle ${nettle+($nettle_version)}"
+if test "$nettle" = "yes"; then
+    echo "nettle            $nettle ($nettle_version)"
+else
+    echo "nettle            $nettle"
+fi
 echo "libtasn1          $tasn1"
 echo "VTE support       $vte"
 echo "curses support    $curses"
@@ -4805,7 +4817,7 @@ echo "libcap-ng support $cap_ng"
 echo "vhost-net support $vhost_net"
 echo "vhost-scsi support $vhost_scsi"
 echo "Trace backends    $trace_backends"
-if test "$trace_backend" = "simple"; then
+if have_backend "simple"; then
 echo "Trace output file $trace_file-<pid>"
 fi
 if test "$spice" = "yes"; then
@@ -5136,6 +5148,9 @@ if test "$nettle" = "yes" ; then
 fi
 if test "$tasn1" = "yes" ; then
   echo "CONFIG_TASN1=y" >> $config_host_mak
+fi
+if test "$have_ifaddrs_h" = "yes" ; then
+    echo "HAVE_IFADDRS_H=y" >> $config_host_mak
 fi
 if test "$vte" = "yes" ; then
   echo "CONFIG_VTE=y" >> $config_host_mak
@@ -5473,6 +5488,19 @@ echo "TRANSLATE_OPT_CFLAGS=$TRANSLATE_OPT_CFLAGS" >> $config_host_mak
 if test "$gcov" = "yes" ; then
   echo "CONFIG_GCOV=y" >> $config_host_mak
   echo "GCOV=$gcov_tool" >> $config_host_mak
+fi
+
+# Which safe_syscall_base implmentation?
+if test "$linux" = "yes" ; then
+  case "$cpu" in
+  x86_64)
+    echo "SAFE_SYSCALL_BASE=safe_syscall/x86_64.o" >> $config_host_mak
+    echo "CONFIG_SAFE_SYSCALL=y" >> $config_host_mak
+    ;;
+  *)
+    echo "SAFE_SYSCALL_BASE=" >> $config_host_mak
+    ;;
+  esac
 fi
 
 # use included Linux headers

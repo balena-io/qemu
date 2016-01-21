@@ -227,7 +227,6 @@ static struct {
     { .driver = "ide-drive",            .flag = &default_cdrom     },
     { .driver = "scsi-cd",              .flag = &default_cdrom     },
     { .driver = "virtio-serial-pci",    .flag = &default_virtcon   },
-    { .driver = "virtio-serial-s390",   .flag = &default_virtcon   },
     { .driver = "virtio-serial",        .flag = &default_virtcon   },
     { .driver = "VGA",                  .flag = &default_vga       },
     { .driver = "isa-vga",              .flag = &default_vga       },
@@ -570,8 +569,8 @@ static int default_driver_check(void *opaque, QemuOpts *opts, Error **errp)
 
 static RunState current_run_state = RUN_STATE_PRELAUNCH;
 
-/* We use RUN_STATE_MAX but any invalid value will do */
-static RunState vmstop_requested = RUN_STATE_MAX;
+/* We use RUN_STATE__MAX but any invalid value will do */
+static RunState vmstop_requested = RUN_STATE__MAX;
 static QemuMutex vmstop_lock;
 
 typedef struct {
@@ -642,10 +641,10 @@ static const RunStateTransition runstate_transitions_def[] = {
     { RUN_STATE_GUEST_PANICKED, RUN_STATE_RUNNING },
     { RUN_STATE_GUEST_PANICKED, RUN_STATE_FINISH_MIGRATE },
 
-    { RUN_STATE_MAX, RUN_STATE_MAX },
+    { RUN_STATE__MAX, RUN_STATE__MAX },
 };
 
-static bool runstate_valid_transitions[RUN_STATE_MAX][RUN_STATE_MAX];
+static bool runstate_valid_transitions[RUN_STATE__MAX][RUN_STATE__MAX];
 
 bool runstate_check(RunState state)
 {
@@ -669,7 +668,7 @@ static void runstate_init(void)
     const RunStateTransition *p;
 
     memset(&runstate_valid_transitions, 0, sizeof(runstate_valid_transitions));
-    for (p = &runstate_transitions_def[0]; p->from != RUN_STATE_MAX; p++) {
+    for (p = &runstate_transitions_def[0]; p->from != RUN_STATE__MAX; p++) {
         runstate_valid_transitions[p->from][p->to] = true;
     }
 
@@ -679,7 +678,7 @@ static void runstate_init(void)
 /* This function will abort() on invalid state transitions */
 void runstate_set(RunState new_state)
 {
-    assert(new_state < RUN_STATE_MAX);
+    assert(new_state < RUN_STATE__MAX);
 
     if (!runstate_valid_transitions[current_run_state][new_state]) {
         error_report("invalid runstate transition: '%s' -> '%s'",
@@ -717,9 +716,9 @@ static bool qemu_vmstop_requested(RunState *r)
 {
     qemu_mutex_lock(&vmstop_lock);
     *r = vmstop_requested;
-    vmstop_requested = RUN_STATE_MAX;
+    vmstop_requested = RUN_STATE__MAX;
     qemu_mutex_unlock(&vmstop_lock);
-    return *r < RUN_STATE_MAX;
+    return *r < RUN_STATE__MAX;
 }
 
 void qemu_system_vmstop_request_prepare(void)
@@ -739,7 +738,7 @@ void vm_start(void)
     RunState requested;
 
     qemu_vmstop_requested(&requested);
-    if (runstate_is_running() && requested == RUN_STATE_MAX) {
+    if (runstate_is_running() && requested == RUN_STATE__MAX) {
         return;
     }
 
@@ -2548,11 +2547,7 @@ static int virtcon_parse(const char *devname)
     }
 
     bus_opts = qemu_opts_create(device, NULL, 0, &error_abort);
-    if (arch_type == QEMU_ARCH_S390X) {
-        qemu_opt_set(bus_opts, "driver", "virtio-serial-s390", &error_abort);
-    } else {
-        qemu_opt_set(bus_opts, "driver", "virtio-serial-pci", &error_abort);
-    }
+    qemu_opt_set(bus_opts, "driver", "virtio-serial", &error_abort);
 
     dev_opts = qemu_opts_create(device, NULL, 0, &error_abort);
     qemu_opt_set(dev_opts, "driver", "virtconsole", &error_abort);
@@ -3043,7 +3038,7 @@ int main(int argc, char **argv, char **envp)
     runstate_init();
 
     if (qcrypto_init(&err) < 0) {
-        error_report("cannot initialize crypto: %s", error_get_pretty(err));
+        error_reportf_err(err, "cannot initialize crypto: ");
         exit(1);
     }
     rtc_clock = QEMU_CLOCK_HOST;
@@ -4329,12 +4324,7 @@ int main(int argc, char **argv, char **envp)
     configure_accelerator(current_machine);
 
     if (qtest_chrdev) {
-        Error *local_err = NULL;
-        qtest_init(qtest_chrdev, qtest_log, &local_err);
-        if (local_err) {
-            error_report_err(local_err);
-            exit(1);
-        }
+        qtest_init(qtest_chrdev, qtest_log, &error_fatal);
     }
 
     machine_opts = qemu_get_machine_opts();
@@ -4345,24 +4335,14 @@ int main(int argc, char **argv, char **envp)
 
     opts = qemu_opts_find(qemu_find_opts("boot-opts"), NULL);
     if (opts) {
-        Error *local_err = NULL;
-
         boot_order = qemu_opt_get(opts, "order");
         if (boot_order) {
-            validate_bootdevices(boot_order, &local_err);
-            if (local_err) {
-                error_report_err(local_err);
-                exit(1);
-            }
+            validate_bootdevices(boot_order, &error_fatal);
         }
 
         boot_once = qemu_opt_get(opts, "once");
         if (boot_once) {
-            validate_bootdevices(boot_once, &local_err);
-            if (local_err) {
-                error_report_err(local_err);
-                exit(1);
-            }
+            validate_bootdevices(boot_once, &error_fatal);
         }
 
         boot_menu = qemu_opt_get_bool(opts, "menu", boot_menu);
@@ -4568,7 +4548,7 @@ int main(int argc, char **argv, char **envp)
         Error *local_err = NULL;
         qemu_boot_set(boot_once, &local_err);
         if (local_err) {
-            error_report("%s", error_get_pretty(local_err));
+            error_report_err(local_err);
             exit(1);
         }
         qemu_register_reset(restore_boot_order, g_strdup(boot_order));
@@ -4664,9 +4644,7 @@ int main(int argc, char **argv, char **envp)
         Error *local_err = NULL;
         qemu_start_incoming_migration(incoming, &local_err);
         if (local_err) {
-            error_report("-incoming %s: %s", incoming,
-                         error_get_pretty(local_err));
-            error_free(local_err);
+            error_reportf_err(local_err, "-incoming %s: ", incoming);
             exit(1);
         }
     } else if (autostart) {

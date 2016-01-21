@@ -35,6 +35,7 @@ extern MachineState *current_machine;
 bool machine_usb(MachineState *machine);
 bool machine_kernel_irqchip_allowed(MachineState *machine);
 bool machine_kernel_irqchip_required(MachineState *machine);
+bool machine_kernel_irqchip_split(MachineState *machine);
 int machine_kvm_shadow_mem(MachineState *machine);
 int machine_phandle_start(MachineState *machine);
 bool machine_dump_guest_core(MachineState *machine);
@@ -92,6 +93,8 @@ struct MachineClass {
     GlobalProperty *compat_props;
     const char *hw_version;
     ram_addr_t default_ram_size;
+    bool option_rom_has_mr;
+    bool rom_file_has_mr;
 
     HotplugHandler *(*get_hotplug_handler)(MachineState *machine,
                                            DeviceState *dev);
@@ -111,6 +114,7 @@ struct MachineState {
     char *accel;
     bool kernel_irqchip_allowed;
     bool kernel_irqchip_required;
+    bool kernel_irqchip_split;
     int kvm_shadow_mem;
     char *dtb;
     char *dumpdtb;
@@ -152,5 +156,14 @@ struct MachineState {
         type_register_static(&machine_initfn##_typeinfo); \
     } \
     machine_init(machine_initfn##_register_types)
+
+#define SET_MACHINE_COMPAT(m, COMPAT) \
+    do {                              \
+        static GlobalProperty props[] = {       \
+            COMPAT                              \
+            { /* end of list */ }               \
+        };                                      \
+        (m)->compat_props = props;              \
+    } while (0)
 
 #endif

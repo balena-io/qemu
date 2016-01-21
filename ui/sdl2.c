@@ -256,7 +256,7 @@ static void sdl_mouse_mode_change(Notifier *notify, void *data)
 static void sdl_send_mouse_event(struct sdl2_console *scon, int dx, int dy,
                                  int x, int y, int state)
 {
-    static uint32_t bmap[INPUT_BUTTON_MAX] = {
+    static uint32_t bmap[INPUT_BUTTON__MAX] = {
         [INPUT_BUTTON_LEFT]       = SDL_BUTTON(SDL_BUTTON_LEFT),
         [INPUT_BUTTON_MIDDLE]     = SDL_BUTTON(SDL_BUTTON_MIDDLE),
         [INPUT_BUTTON_RIGHT]      = SDL_BUTTON(SDL_BUTTON_RIGHT),
@@ -504,9 +504,9 @@ static void handle_mousewheel(SDL_Event *ev)
     InputButton btn;
 
     if (wev->y > 0) {
-        btn = INPUT_BUTTON_WHEEL_UP;
+        btn = INPUT_BUTTON_WHEELUP;
     } else if (wev->y < 0) {
-        btn = INPUT_BUTTON_WHEEL_DOWN;
+        btn = INPUT_BUTTON_WHEELDOWN;
     } else {
         return;
     }
@@ -700,6 +700,13 @@ static const DisplayChangeListenerOps dcl_gl_ops = {
     .dpy_refresh             = sdl2_gl_refresh,
     .dpy_mouse_set           = sdl_mouse_warp,
     .dpy_cursor_define       = sdl_mouse_define,
+
+    .dpy_gl_ctx_create       = sdl2_gl_create_context,
+    .dpy_gl_ctx_destroy      = sdl2_gl_destroy_context,
+    .dpy_gl_ctx_make_current = sdl2_gl_make_context_current,
+    .dpy_gl_ctx_get_current  = sdl2_gl_get_current_context,
+    .dpy_gl_scanout          = sdl2_gl_scanout,
+    .dpy_gl_update           = sdl2_gl_scanout_flush,
 };
 #endif
 

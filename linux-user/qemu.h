@@ -80,16 +80,9 @@ struct vm86_saved_state {
 
 #define MAX_SIGQUEUE_SIZE 1024
 
-struct sigqueue {
-    struct sigqueue *next;
-    target_siginfo_t info;
-};
-
 struct emulated_sigtable {
     int pending; /* true if signal is pending */
-    struct sigqueue *first;
-    struct sigqueue info; /* in order to always have memory for the
-                             first signal, we put it here */
+    target_siginfo_t info;
 };
 
 /* NOTE: we force a big alignment so that the stack stored after is
@@ -125,14 +118,16 @@ typedef struct TaskState {
 #endif
     uint32_t stack_base;
     int used; /* non zero if used */
-    bool sigsegv_blocked; /* SIGSEGV blocked by guest */
     struct image_info *info;
     struct linux_binprm *bprm;
 
+    struct emulated_sigtable sync_signal;
     struct emulated_sigtable sigtab[TARGET_NSIG];
-    struct sigqueue sigqueue_table[MAX_SIGQUEUE_SIZE]; /* siginfo queue */
-    struct sigqueue *first_free; /* first free siginfo queue entry */
-    int signal_pending; /* non zero if a signal may be pending */
+    sigset_t signal_mask;
+
+    /* non zero if host signals blocked, bit 1 set if signal pending */
+    volatile int signal_pending;
+
 } __attribute__((aligned(16))) TaskState;
 
 extern char *exec_path;
@@ -140,6 +135,7 @@ void init_task_state(TaskState *ts);
 void task_settid(TaskState *);
 void stop_all_tasks(void);
 extern const char *qemu_uname_release;
+extern const char *qemu_execve_path;
 extern unsigned long mmap_min_addr;
 
 /* ??? See if we can avoid exposing so much of the loader internals.  */
@@ -207,8 +203,25 @@ unsigned long init_guest_space(unsigned long host_start,
 
 #include "qemu/log.h"
 
+/* safe_syscall.S */
+
+/* Call a system call if guest signal not pending.
+ * Returns -TARGET_ESIGRETURN if signal pending.
+ * Returns guest error code on error.
+ */
+
+extern long safe_syscall_base(volatile int *pending, long number, ...);
+#define safe_syscall(...) \
+    safe_syscall_base(&((TaskState *)thread_cpu->opaque)->signal_pending, \
+    __VA_ARGS__)
+
+/* For host_signal_handler() */
+extern char safe_syscall_start[];
+extern char safe_syscall_end[];
+
 /* syscall.c */
 int host_to_target_waitstatus(int status);
+abi_long convert_syscall_return_value(abi_long ret);
 
 /* strace.c */
 void print_syscall(int num,
@@ -229,6 +242,7 @@ long do_sigreturn(CPUArchState *env);
 long do_rt_sigreturn(CPUArchState *env);
 abi_long do_sigaltstack(abi_ulong uss_addr, abi_ulong uoss_addr, abi_ulong sp);
 int do_sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
+int block_signals(void); /* Returns non zero if signal pending */
 
 #ifdef TARGET_I386
 /* vm86.c */

@@ -84,7 +84,7 @@ static ssize_t dump_receive_iov(DumpState *s, const struct iovec *iov, int cnt)
     cnt = iov_copy(&dumpiov[1], cnt, iov, cnt, 0, caplen);
 
     if (writev(s->fd, dumpiov, cnt + 1) != sizeof(hdr) + caplen) {
-        qemu_log("-net dump write error - stop dump\n");
+        error_report("network dump write error - stopping dump");
         close(s->fd);
         s->fd = -1;
     }
@@ -329,6 +329,13 @@ static void filter_dump_instance_init(Object *obj)
                             file_dump_set_filename, NULL);
 }
 
+static void filter_dump_instance_finalize(Object *obj)
+{
+    NetFilterDumpState *nfds = FILTER_DUMP(obj);
+
+    g_free(nfds->filename);
+}
+
 static void filter_dump_class_init(ObjectClass *oc, void *data)
 {
     NetFilterClass *nfc = NETFILTER_CLASS(oc);
@@ -343,6 +350,7 @@ static const TypeInfo filter_dump_info = {
     .parent = TYPE_NETFILTER,
     .class_init = filter_dump_class_init,
     .instance_init = filter_dump_instance_init,
+    .instance_finalize = filter_dump_instance_finalize,
     .instance_size = sizeof(NetFilterDumpState),
 };
 

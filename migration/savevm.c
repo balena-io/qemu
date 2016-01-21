@@ -1399,6 +1399,8 @@ static void *postcopy_ram_listen_thread(void *opaque)
     MigrationIncomingState *mis = migration_incoming_get_current();
     int load_res;
 
+    migrate_set_state(&mis->state, MIGRATION_STATUS_ACTIVE,
+                                   MIGRATION_STATUS_POSTCOPY_ACTIVE);
     qemu_sem_post(&mis->listen_thread_sem);
     trace_postcopy_ram_listen_thread_start();
 
@@ -1415,6 +1417,8 @@ static void *postcopy_ram_listen_thread(void *opaque)
     if (load_res < 0) {
         error_report("%s: loadvm failed: %d", __func__, load_res);
         qemu_file_set_error(f, load_res);
+        migrate_set_state(&mis->state, MIGRATION_STATUS_POSTCOPY_ACTIVE,
+                                       MIGRATION_STATUS_FAILED);
     } else {
         /*
          * This looks good, but it's possible that the device loading in the
@@ -1424,13 +1428,6 @@ static void *postcopy_ram_listen_thread(void *opaque)
         qemu_event_wait(&mis->main_thread_load_event);
     }
     postcopy_ram_incoming_cleanup(mis);
-    /*
-     * If everything has worked fine, then the main thread has waited
-     * for us to start, and we're the last use of the mis.
-     * (If something broke then qemu will have to exit anyway since it's
-     * got a bad migration state).
-     */
-    migration_incoming_state_destroy();
 
     if (load_res < 0) {
         /*
@@ -1441,6 +1438,17 @@ static void *postcopy_ram_listen_thread(void *opaque)
          */
         exit(EXIT_FAILURE);
     }
+
+    migrate_set_state(&mis->state, MIGRATION_STATUS_POSTCOPY_ACTIVE,
+                                   MIGRATION_STATUS_COMPLETED);
+    /*
+     * If everything has worked fine, then the main thread has waited
+     * for us to start, and we're the last use of the mis.
+     * (If something broke then qemu will have to exit anyway since it's
+     * got a bad migration state).
+     */
+    migration_incoming_state_destroy();
+
 
     return NULL;
 }
@@ -1563,8 +1571,8 @@ static int loadvm_handle_cmd_packaged(MigrationIncomingState *mis)
     ret = qemu_get_buffer(mis->from_src_file, buffer, (int)length);
     if (ret != length) {
         g_free(buffer);
-        error_report("CMD_PACKAGED: Buffer receive fail ret=%d length=%d\n",
-                ret, length);
+        error_report("CMD_PACKAGED: Buffer receive fail ret=%d length=%d",
+                     ret, length);
         return (ret < 0) ? ret : -EAGAIN;
     }
     trace_loadvm_handle_cmd_packaged_received(ret);
@@ -1927,10 +1935,9 @@ void hmp_savevm(Monitor *mon, const QDict *qdict)
 
     /* Delete old snapshots of the same name */
     if (name && bdrv_all_delete_snapshot(name, &bs1, &local_err) < 0) {
-        monitor_printf(mon,
-                       "Error while deleting snapshot on device '%s': %s\n",
-                       bdrv_get_device_name(bs1), error_get_pretty(local_err));
-        error_free(local_err);
+        error_reportf_err(local_err,
+                          "Error while deleting snapshot on device '%s': ",
+                          bdrv_get_device_name(bs1));
         return;
     }
 
@@ -1984,8 +1991,7 @@ void hmp_savevm(Monitor *mon, const QDict *qdict)
     vm_state_size = qemu_ftell(f);
     qemu_fclose(f);
     if (ret < 0) {
-        monitor_printf(mon, "%s\n", error_get_pretty(local_err));
-        error_free(local_err);
+        error_report_err(local_err);
         goto the_end;
     }
 
@@ -2109,10 +2115,9 @@ void hmp_delvm(Monitor *mon, const QDict *qdict)
     const char *name = qdict_get_str(qdict, "name");
 
     if (bdrv_all_delete_snapshot(name, &bs, &err) < 0) {
-        monitor_printf(mon,
-                       "Error while deleting snapshot on device '%s': %s\n",
-                       bdrv_get_device_name(bs), error_get_pretty(err));
-        error_free(err);
+        error_reportf_err(err,
+                          "Error while deleting snapshot on device '%s': ",
+                          bdrv_get_device_name(bs));
     }
 }
 

@@ -512,8 +512,6 @@ Arguments:
 - "data": data to write (json-string)
 - "format": data format (json-string, optional)
           - Possible values: "utf8" (default), "base64"
-            Bug: invalid base64 is currently not rejected.
-            Whitespace *is* invalid.
 
 Example:
 
@@ -1637,7 +1635,7 @@ Arguments:
 - "speed": maximum speed of the streaming job, in bytes per second
   (json-int)
 - "granularity": granularity of the dirty bitmap, in bytes (json-int, optional)
-- "buf_size": maximum amount of data in flight from source to target, in bytes
+- "buf-size": maximum amount of data in flight from source to target, in bytes
   (json-int, default 10M)
 - "sync": what parts of the disk image should be copied to the destination;
   possibilities include "full" for all the disk, "top" for only the sectors
@@ -1666,6 +1664,54 @@ Example:
 
 EQMP
 
+    {
+        .name       = "blockdev-mirror",
+        .args_type  = "sync:s,device:B,target:B,replaces:s?,speed:i?,"
+                      "on-source-error:s?,on-target-error:s?,"
+                      "granularity:i?,buf-size:i?",
+        .mhandler.cmd_new = qmp_marshal_blockdev_mirror,
+    },
+
+SQMP
+blockdev-mirror
+------------
+
+Start mirroring a block device's writes to another block device. target
+specifies the target of mirror operation.
+
+Arguments:
+
+- "device": device name to operate on (json-string)
+- "target": device name to mirror to (json-string)
+- "replaces": the block driver node name to replace when finished
+              (json-string, optional)
+- "speed": maximum speed of the streaming job, in bytes per second
+  (json-int)
+- "granularity": granularity of the dirty bitmap, in bytes (json-int, optional)
+- "buf_size": maximum amount of data in flight from source to target, in bytes
+  (json-int, default 10M)
+- "sync": what parts of the disk image should be copied to the destination;
+  possibilities include "full" for all the disk, "top" for only the sectors
+  allocated in the topmost image, or "none" to only replicate new I/O
+  (MirrorSyncMode).
+- "on-source-error": the action to take on an error on the source
+  (BlockdevOnError, default 'report')
+- "on-target-error": the action to take on an error on the target
+  (BlockdevOnError, default 'report')
+
+The default value of the granularity is the image cluster size clamped
+between 4096 and 65536, if the image format defines one.  If the format
+does not define a cluster size, the default value of the granularity
+is 65536.
+
+Example:
+
+-> { "execute": "blockdev-mirror", "arguments": { "device": "ide-hd0",
+                                                  "target": "target0",
+                                                  "sync": "full" } }
+<- { "return": {} }
+
+EQMP
     {
         .name       = "change-backing-file",
         .args_type  = "device:s,image-node-name:s,backing-file:s",
@@ -2765,6 +2811,8 @@ Return a json-array. Each CPU is represented by a json-object, which contains:
 - "current": true if this is the current CPU, false otherwise (json-bool)
 - "halted": true if the cpu is halted, false otherwise (json-bool)
 - "qom_path": path to the CPU object in the QOM tree (json-str)
+- "arch": architecture of the cpu, which determines what additional
+          keys will be present (json-str)
 - Current program counter. The key's name depends on the architecture:
      "pc": i386/x86_64 (json-int)
      "nip": PPC (json-int)
@@ -2782,6 +2830,7 @@ Example:
             "current":true,
             "halted":false,
             "qom_path":"/machine/unattached/device[0]",
+            "arch":"x86",
             "pc":3227107138,
             "thread_id":3134
          },
@@ -2790,6 +2839,7 @@ Example:
             "current":false,
             "halted":true,
             "qom_path":"/machine/unattached/device[2]",
+            "arch":"x86",
             "pc":7108165,
             "thread_id":3135
          }

@@ -500,21 +500,17 @@ static int raw_open_common(BlockDriverState *bs, QDict *options,
         goto fail;
     }
     if (!s->use_aio && (bdrv_flags & BDRV_O_NATIVE_AIO)) {
-        error_printf("WARNING: aio=native was specified for '%s', but "
-                     "it requires cache.direct=on, which was not "
-                     "specified. Falling back to aio=threads.\n"
-                     "         This will become an error condition in "
-                     "future QEMU versions.\n",
-                     bs->filename);
+        error_setg(errp, "aio=native was specified, but it requires "
+                         "cache.direct=on, which was not specified.");
+        ret = -EINVAL;
+        goto fail;
     }
 #else
     if (bdrv_flags & BDRV_O_NATIVE_AIO) {
-        error_printf("WARNING: aio=native was specified for '%s', but "
-                     "is not supported in this build. Falling back to "
-                     "aio=threads.\n"
-                     "         This will become an error condition in "
-                     "future QEMU versions.\n",
-                     bs->filename);
+        error_setg(errp, "aio=native was specified, but is not supported "
+                         "in this build.");
+        ret = -EINVAL;
+        goto fail;
     }
 #endif /* !defined(CONFIG_LINUX_AIO) */
 
@@ -1636,7 +1632,7 @@ static int raw_create(const char *filename, QemuOpts *opts, Error **errp)
     nocow = qemu_opt_get_bool(opts, BLOCK_OPT_NOCOW, false);
     buf = qemu_opt_get_del(opts, BLOCK_OPT_PREALLOC);
     prealloc = qapi_enum_parse(PreallocMode_lookup, buf,
-                               PREALLOC_MODE_MAX, PREALLOC_MODE_OFF,
+                               PREALLOC_MODE__MAX, PREALLOC_MODE_OFF,
                                &local_err);
     g_free(buf);
     if (local_err) {

@@ -941,6 +941,13 @@ M: Jiri Pirko <jiri@resnulli.us>
 S: Maintained
 F: hw/net/rocker/
 
+NVDIMM
+M: Xiao Guangrong <guangrong.xiao@linux.intel.com>
+S: Maintained
+F: hw/acpi/nvdimm.c
+F: hw/mem/nvdimm.c
+F: include/hw/mem/nvdimm.h
+
 Subsystems
 ----------
 Audio
@@ -1029,7 +1036,8 @@ Device Tree
 M: Peter Crosthwaite <crosthwaite.peter@gmail.com>
 M: Alexander Graf <agraf@suse.de>
 S: Maintained
-F: device_tree.[ch]
+F: device_tree.c
+F: include/sysemu/device_tree.h
 
 Error reporting
 M: Markus Armbruster <armbru@redhat.com>
@@ -1192,6 +1200,7 @@ SLIRP
 M: Jan Kiszka <jan.kiszka@siemens.com>
 S: Maintained
 F: slirp/
+F: net/slirp.c
 T: git git://git.kiszka.org/qemu.git queues/slirp
 
 Tracing
@@ -1242,6 +1251,13 @@ M: Daniel P. Berrange <berrange@redhat.com>
 S: Odd fixes
 F: util/buffer.c
 F: include/qemu/buffer.h
+
+I/O Channels
+M: Daniel P. Berrange <berrange@redhat.com>
+S: Maintained
+F: io/
+F: include/io/
+F: tests/test-io-*
 
 Usermode Emulation
 ------------------
@@ -1483,6 +1499,7 @@ M: Denis V. Lunev <den@openvz.org>
 L: qemu-block@nongnu.org
 S: Supported
 F: block/parallels.c
+F: docs/specs/parallels.txt
 
 qed
 M: Stefan Hajnoczi <stefanha@redhat.com>

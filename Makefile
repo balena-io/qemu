@@ -159,6 +159,7 @@ dummy := $(call unnest-vars,, \
                 crypto-obj-y \
                 crypto-aes-obj-y \
                 qom-obj-y \
+                io-obj-y \
                 common-obj-y \
                 common-obj-m)
 
@@ -178,6 +179,7 @@ SOFTMMU_SUBDIR_RULES=$(filter %-softmmu,$(SUBDIR_RULES))
 
 $(SOFTMMU_SUBDIR_RULES): $(block-obj-y)
 $(SOFTMMU_SUBDIR_RULES): $(crypto-obj-y)
+$(SOFTMMU_SUBDIR_RULES): $(io-obj-y)
 $(SOFTMMU_SUBDIR_RULES): config-all-devices.mak
 
 subdir-%:
@@ -238,7 +240,7 @@ qemu-io$(EXESUF): qemu-io.o $(block-obj-y) $(crypto-obj-y) $(qom-obj-y) libqemuu
 
 qemu-bridge-helper$(EXESUF): qemu-bridge-helper.o
 
-fsdev/virtfs-proxy-helper$(EXESUF): fsdev/virtfs-proxy-helper.o fsdev/virtio-9p-marshal.o libqemuutil.a libqemustub.a
+fsdev/virtfs-proxy-helper$(EXESUF): fsdev/virtfs-proxy-helper.o fsdev/9p-marshal.o fsdev/9p-iov-marshal.o libqemuutil.a libqemustub.a
 fsdev/virtfs-proxy-helper$(EXESUF): LIBS += -lcap
 
 qemu-img-cmds.h: $(SRC_PATH)/qemu-img-cmds.hx
@@ -269,7 +271,8 @@ $(SRC_PATH)/qga/qapi-schema.json $(SRC_PATH)/scripts/qapi-commands.py $(qapi-py)
 
 qapi-modules = $(SRC_PATH)/qapi-schema.json $(SRC_PATH)/qapi/common.json \
                $(SRC_PATH)/qapi/block.json $(SRC_PATH)/qapi/block-core.json \
-               $(SRC_PATH)/qapi/event.json $(SRC_PATH)/qapi/introspect.json
+               $(SRC_PATH)/qapi/event.json $(SRC_PATH)/qapi/introspect.json \
+               $(SRC_PATH)/qapi/crypto.json
 
 qapi-types.c qapi-types.h :\
 $(qapi-modules) $(SRC_PATH)/scripts/qapi-types.py $(qapi-py)

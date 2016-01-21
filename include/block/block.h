@@ -150,6 +150,7 @@ typedef struct BDRVReopenState {
     BlockDriverState *bs;
     int flags;
     QDict *options;
+    QDict *explicit_options;
     void *opaque;
 } BDRVReopenState;
 
@@ -168,7 +169,8 @@ typedef enum BlockOpType {
     BLOCK_OP_TYPE_EXTERNAL_SNAPSHOT,
     BLOCK_OP_TYPE_INTERNAL_SNAPSHOT,
     BLOCK_OP_TYPE_INTERNAL_SNAPSHOT_DELETE,
-    BLOCK_OP_TYPE_MIRROR,
+    BLOCK_OP_TYPE_MIRROR_SOURCE,
+    BLOCK_OP_TYPE_MIRROR_TARGET,
     BLOCK_OP_TYPE_RESIZE,
     BLOCK_OP_TYPE_STREAM,
     BLOCK_OP_TYPE_REPLACE,
@@ -197,7 +199,6 @@ int bdrv_create_file(const char *filename, QemuOpts *opts, Error **errp);
 BlockDriverState *bdrv_new_root(void);
 BlockDriverState *bdrv_new(void);
 void bdrv_make_anon(BlockDriverState *bs);
-void bdrv_swap(BlockDriverState *bs_new, BlockDriverState *bs_old);
 void bdrv_append(BlockDriverState *bs_new, BlockDriverState *bs_top);
 void bdrv_replace_in_backing_chain(BlockDriverState *old,
                                    BlockDriverState *new);
@@ -210,7 +211,8 @@ BdrvChild *bdrv_open_child(const char *filename,
                            const BdrvChildRole *child_role,
                            bool allow_none, Error **errp);
 void bdrv_set_backing_hd(BlockDriverState *bs, BlockDriverState *backing_hd);
-int bdrv_open_backing_file(BlockDriverState *bs, QDict *options, Error **errp);
+int bdrv_open_backing_file(BlockDriverState *bs, QDict *parent_options,
+                           const char *bdref_key, Error **errp);
 int bdrv_append_temp_snapshot(BlockDriverState *bs, int flags, Error **errp);
 int bdrv_open(BlockDriverState **pbs, const char *filename,
               const char *reference, QDict *options, int flags, Error **errp);
@@ -304,9 +306,9 @@ int bdrv_check(BlockDriverState *bs, BdrvCheckResult *res, BdrvCheckMode fix);
  * block driver; total_work_size may change during the course of the amendment
  * operation */
 typedef void BlockDriverAmendStatusCB(BlockDriverState *bs, int64_t offset,
-                                      int64_t total_work_size);
+                                      int64_t total_work_size, void *opaque);
 int bdrv_amend_options(BlockDriverState *bs_new, QemuOpts *opts,
-                       BlockDriverAmendStatusCB *status_cb);
+                       BlockDriverAmendStatusCB *status_cb, void *cb_opaque);
 
 /* external snapshots */
 bool bdrv_recurse_is_first_non_filter(BlockDriverState *bs,
@@ -520,66 +522,6 @@ void bdrv_op_block_all(BlockDriverState *bs, Error *reason);
 void bdrv_op_unblock_all(BlockDriverState *bs, Error *reason);
 bool bdrv_op_blocker_is_empty(BlockDriverState *bs);
 
-typedef enum {
-    BLKDBG_L1_UPDATE,
-
-    BLKDBG_L1_GROW_ALLOC_TABLE,
-    BLKDBG_L1_GROW_WRITE_TABLE,
-    BLKDBG_L1_GROW_ACTIVATE_TABLE,
-
-    BLKDBG_L2_LOAD,
-    BLKDBG_L2_UPDATE,
-    BLKDBG_L2_UPDATE_COMPRESSED,
-    BLKDBG_L2_ALLOC_COW_READ,
-    BLKDBG_L2_ALLOC_WRITE,
-
-    BLKDBG_READ_AIO,
-    BLKDBG_READ_BACKING_AIO,
-    BLKDBG_READ_COMPRESSED,
-
-    BLKDBG_WRITE_AIO,
-    BLKDBG_WRITE_COMPRESSED,
-
-    BLKDBG_VMSTATE_LOAD,
-    BLKDBG_VMSTATE_SAVE,
-
-    BLKDBG_COW_READ,
-    BLKDBG_COW_WRITE,
-
-    BLKDBG_REFTABLE_LOAD,
-    BLKDBG_REFTABLE_GROW,
-    BLKDBG_REFTABLE_UPDATE,
-
-    BLKDBG_REFBLOCK_LOAD,
-    BLKDBG_REFBLOCK_UPDATE,
-    BLKDBG_REFBLOCK_UPDATE_PART,
-    BLKDBG_REFBLOCK_ALLOC,
-    BLKDBG_REFBLOCK_ALLOC_HOOKUP,
-    BLKDBG_REFBLOCK_ALLOC_WRITE,
-    BLKDBG_REFBLOCK_ALLOC_WRITE_BLOCKS,
-    BLKDBG_REFBLOCK_ALLOC_WRITE_TABLE,
-    BLKDBG_REFBLOCK_ALLOC_SWITCH_TABLE,
-
-    BLKDBG_CLUSTER_ALLOC,
-    BLKDBG_CLUSTER_ALLOC_BYTES,
-    BLKDBG_CLUSTER_FREE,
-
-    BLKDBG_FLUSH_TO_OS,
-    BLKDBG_FLUSH_TO_DISK,
-
-    BLKDBG_PWRITEV_RMW_HEAD,
-    BLKDBG_PWRITEV_RMW_AFTER_HEAD,
-    BLKDBG_PWRITEV_RMW_TAIL,
-    BLKDBG_PWRITEV_RMW_AFTER_TAIL,
-    BLKDBG_PWRITEV,
-    BLKDBG_PWRITEV_ZERO,
-    BLKDBG_PWRITEV_DONE,
-
-    BLKDBG_EMPTY_IMAGE_PREPARE,
-
-    BLKDBG_EVENT_MAX,
-} BlkDebugEvent;
-
 #define BLKDBG_EVENT(child, evt) \
     do { \
         if (child) { \
@@ -587,7 +529,7 @@ typedef enum {
         } \
     } while (0)
 
-void bdrv_debug_event(BlockDriverState *bs, BlkDebugEvent event);
+void bdrv_debug_event(BlockDriverState *bs, BlkdebugEvent event);
 
 int bdrv_debug_breakpoint(BlockDriverState *bs, const char *event,
                            const char *tag);

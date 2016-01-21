@@ -11,6 +11,7 @@
  */
 
 #include "hw/boards.h"
+#include "qapi-visit.h"
 #include "qapi/visitor.h"
 #include "hw/sysbus.h"
 #include "sysemu/sysemu.h"
@@ -31,12 +32,39 @@ static void machine_set_accel(Object *obj, const char *value, Error **errp)
     ms->accel = g_strdup(value);
 }
 
-static void machine_set_kernel_irqchip(Object *obj, bool value, Error **errp)
+static void machine_set_kernel_irqchip(Object *obj, Visitor *v,
+                                       void *opaque, const char *name,
+                                       Error **errp)
 {
+    Error *err = NULL;
     MachineState *ms = MACHINE(obj);
+    OnOffSplit mode;
 
-    ms->kernel_irqchip_allowed = value;
-    ms->kernel_irqchip_required = value;
+    visit_type_OnOffSplit(v, &mode, name, &err);
+    if (err) {
+        error_propagate(errp, err);
+        return;
+    } else {
+        switch (mode) {
+        case ON_OFF_SPLIT_ON:
+            ms->kernel_irqchip_allowed = true;
+            ms->kernel_irqchip_required = true;
+            ms->kernel_irqchip_split = false;
+            break;
+        case ON_OFF_SPLIT_OFF:
+            ms->kernel_irqchip_allowed = false;
+            ms->kernel_irqchip_required = false;
+            ms->kernel_irqchip_split = false;
+            break;
+        case ON_OFF_SPLIT_SPLIT:
+            ms->kernel_irqchip_allowed = true;
+            ms->kernel_irqchip_required = true;
+            ms->kernel_irqchip_split = true;
+            break;
+        default:
+            abort();
+        }
+    }
 }
 
 static void machine_get_kvm_shadow_mem(Object *obj, Visitor *v,
@@ -314,6 +342,7 @@ static void machine_class_init(ObjectClass *oc, void *data)
 
     /* Default 128 MB as guest ram size */
     mc->default_ram_size = 128 * M_BYTE;
+    mc->rom_file_has_mr = true;
 }
 
 static void machine_class_base_init(ObjectClass *oc, void *data)
@@ -341,12 +370,12 @@ static void machine_initfn(Object *obj)
     object_property_set_description(obj, "accel",
                                     "Accelerator list",
                                     NULL);
-    object_property_add_bool(obj, "kernel-irqchip",
-                             NULL,
-                             machine_set_kernel_irqchip,
-                             NULL);
+    object_property_add(obj, "kernel-irqchip", "OnOffSplit",
+                        NULL,
+                        machine_set_kernel_irqchip,
+                        NULL, NULL, NULL);
     object_property_set_description(obj, "kernel-irqchip",
-                                    "Use KVM in-kernel irqchip",
+                                    "Configure KVM in-kernel irqchip",
                                     NULL);
     object_property_add(obj, "kvm-shadow-mem", "int",
                         machine_get_kvm_shadow_mem,
@@ -470,6 +499,11 @@ bool machine_kernel_irqchip_allowed(MachineState *machine)
 bool machine_kernel_irqchip_required(MachineState *machine)
 {
     return machine->kernel_irqchip_required;
+}
+
+bool machine_kernel_irqchip_split(MachineState *machine)
+{
+    return machine->kernel_irqchip_split;
 }
 
 int machine_kvm_shadow_mem(MachineState *machine)

@@ -80,10 +80,18 @@ check-unit-y += tests/test-write-threshold$(EXESUF)
 gcov-files-test-write-threshold-y = block/write-threshold.c
 check-unit-$(CONFIG_GNUTLS_HASH) += tests/test-crypto-hash$(EXESUF)
 check-unit-y += tests/test-crypto-cipher$(EXESUF)
+check-unit-y += tests/test-crypto-secret$(EXESUF)
 check-unit-$(CONFIG_GNUTLS) += tests/test-crypto-tlscredsx509$(EXESUF)
 check-unit-$(CONFIG_GNUTLS) += tests/test-crypto-tlssession$(EXESUF)
 check-unit-$(CONFIG_LINUX) += tests/test-qga$(EXESUF)
 check-unit-y += tests/test-timed-average$(EXESUF)
+check-unit-y += tests/test-io-task$(EXESUF)
+check-unit-y += tests/test-io-channel-socket$(EXESUF)
+check-unit-y += tests/test-io-channel-file$(EXESUF)
+check-unit-$(CONFIG_GNUTLS) += tests/test-io-channel-tls$(EXESUF)
+check-unit-y += tests/test-io-channel-command$(EXESUF)
+check-unit-y += tests/test-io-channel-buffer$(EXESUF)
+check-unit-y += tests/test-base64$(EXESUF)
 
 check-block-$(CONFIG_POSIX) += tests/qemu-iotests-quick.sh
 
@@ -166,6 +174,8 @@ gcov-files-i386-y += hw/block/hd-geometry.c
 check-qtest-i386-y += tests/boot-order-test$(EXESUF)
 check-qtest-i386-y += tests/bios-tables-test$(EXESUF)
 check-qtest-i386-y += tests/rtc-test$(EXESUF)
+check-qtest-i386-y += tests/ipmi-kcs-test$(EXESUF)
+check-qtest-i386-y += tests/ipmi-bt-test$(EXESUF)
 check-qtest-i386-y += tests/i440fx-test$(EXESUF)
 check-qtest-i386-y += tests/fw_cfg-test$(EXESUF)
 check-qtest-i386-y += tests/drive_del-test$(EXESUF)
@@ -246,6 +256,7 @@ qapi-schema += args-array-unknown.json
 qapi-schema += args-int.json
 qapi-schema += args-invalid.json
 qapi-schema += args-member-array-bad.json
+qapi-schema += args-member-case.json
 qapi-schema += args-member-unknown.json
 qapi-schema += args-name-clash.json
 qapi-schema += args-union.json
@@ -256,6 +267,8 @@ qapi-schema += bad-ident.json
 qapi-schema += bad-type-bool.json
 qapi-schema += bad-type-dict.json
 qapi-schema += bad-type-int.json
+qapi-schema += base-cycle-direct.json
+qapi-schema += base-cycle-indirect.json
 qapi-schema += command-int.json
 qapi-schema += comments.json
 qapi-schema += double-data.json
@@ -267,23 +280,20 @@ qapi-schema += enum-bad-prefix.json
 qapi-schema += enum-clash-member.json
 qapi-schema += enum-dict-member.json
 qapi-schema += enum-int-member.json
-qapi-schema += enum-max-member.json
+qapi-schema += enum-member-case.json
 qapi-schema += enum-missing-data.json
 qapi-schema += enum-wrong-data.json
 qapi-schema += escape-outside-string.json
 qapi-schema += escape-too-big.json
 qapi-schema += escape-too-short.json
 qapi-schema += event-case.json
-qapi-schema += event-max.json
 qapi-schema += event-nest-struct.json
 qapi-schema += flat-union-array-branch.json
 qapi-schema += flat-union-bad-base.json
 qapi-schema += flat-union-bad-discriminator.json
 qapi-schema += flat-union-base-any.json
 qapi-schema += flat-union-base-union.json
-qapi-schema += flat-union-clash-branch.json
 qapi-schema += flat-union-clash-member.json
-qapi-schema += flat-union-clash-type.json
 qapi-schema += flat-union-empty.json
 qapi-schema += flat-union-inline.json
 qapi-schema += flat-union-int-branch.json
@@ -320,9 +330,11 @@ qapi-schema += redefined-command.json
 qapi-schema += redefined-event.json
 qapi-schema += redefined-type.json
 qapi-schema += reserved-command-q.json
+qapi-schema += reserved-enum-q.json
 qapi-schema += reserved-member-has.json
 qapi-schema += reserved-member-q.json
 qapi-schema += reserved-member-u.json
+qapi-schema += reserved-member-underscore.json
 qapi-schema += reserved-type-kind.json
 qapi-schema += reserved-type-list.json
 qapi-schema += returns-alternate.json
@@ -341,14 +353,12 @@ qapi-schema += unclosed-list.json
 qapi-schema += unclosed-object.json
 qapi-schema += unclosed-string.json
 qapi-schema += unicode-str.json
-qapi-schema += union-bad-branch.json
 qapi-schema += union-base-no-discriminator.json
+qapi-schema += union-branch-case.json
 qapi-schema += union-clash-branches.json
 qapi-schema += union-clash-data.json
-qapi-schema += union-clash-type.json
 qapi-schema += union-empty.json
 qapi-schema += union-invalid-base.json
-qapi-schema += union-max.json
 qapi-schema += union-optional-branch.json
 qapi-schema += union-unknown.json
 qapi-schema += unknown-escape.json
@@ -381,6 +391,7 @@ test-qapi-obj-y = tests/test-qapi-visit.o tests/test-qapi-types.o \
 	$(test-qom-obj-y)
 test-crypto-obj-y = $(crypto-obj-y) $(test-qom-obj-y)
 test-block-obj-y = $(block-obj-y) $(test-crypto-obj-y)
+test-io-obj-y = $(io-obj-y) $(test-crypto-obj-y)
 
 tests/check-qint$(EXESUF): tests/check-qint.o $(test-util-obj-y)
 tests/check-qstring$(EXESUF): tests/check-qstring.o $(test-util-obj-y)
@@ -416,6 +427,8 @@ tests/test-vmstate$(EXESUF): tests/test-vmstate.o \
 	$(test-qom-obj-y)
 tests/test-timed-average$(EXESUF): tests/test-timed-average.o qemu-timer.o \
 	$(test-util-obj-y)
+tests/test-base64$(EXESUF): tests/test-base64.o \
+	libqemuutil.a libqemustub.a
 
 tests/test-qapi-types.c tests/test-qapi-types.h :\
 $(SRC_PATH)/tests/qapi-schema/qapi-schema-test.json $(SRC_PATH)/scripts/qapi-types.py $(qapi-py)
@@ -457,6 +470,7 @@ tests/test-mul64$(EXESUF): tests/test-mul64.o $(test-util-obj-y)
 tests/test-bitops$(EXESUF): tests/test-bitops.o $(test-util-obj-y)
 tests/test-crypto-hash$(EXESUF): tests/test-crypto-hash.o $(test-crypto-obj-y)
 tests/test-crypto-cipher$(EXESUF): tests/test-crypto-cipher.o $(test-crypto-obj-y)
+tests/test-crypto-secret$(EXESUF): tests/test-crypto-secret.o $(test-crypto-obj-y)
 
 tests/crypto-tls-x509-helpers.o-cflags := $(TASN1_CFLAGS)
 tests/crypto-tls-x509-helpers.o-libs := $(TASN1_LIBS)
@@ -469,6 +483,18 @@ tests/test-crypto-tlscredsx509$(EXESUF): tests/test-crypto-tlscredsx509.o \
 tests/test-crypto-tlssession.o-cflags := $(TASN1_CFLAGS)
 tests/test-crypto-tlssession$(EXESUF): tests/test-crypto-tlssession.o \
 	tests/crypto-tls-x509-helpers.o tests/pkix_asn1_tab.o $(test-crypto-obj-y)
+tests/test-io-task$(EXESUF): tests/test-io-task.o $(test-io-obj-y)
+tests/test-io-channel-socket$(EXESUF): tests/test-io-channel-socket.o \
+        tests/io-channel-helpers.o $(test-io-obj-y)
+tests/test-io-channel-file$(EXESUF): tests/test-io-channel-file.o \
+        tests/io-channel-helpers.o $(test-io-obj-y)
+tests/test-io-channel-tls$(EXESUF): tests/test-io-channel-tls.o \
+	tests/crypto-tls-x509-helpers.o tests/pkix_asn1_tab.o \
+	tests/io-channel-helpers.o $(test-io-obj-y)
+tests/test-io-channel-command$(EXESUF): tests/test-io-channel-command.o \
+        tests/io-channel-helpers.o $(test-io-obj-y)
+tests/test-io-channel-buffer$(EXESUF): tests/test-io-channel-buffer.o \
+        tests/io-channel-helpers.o $(test-io-obj-y)
 
 libqos-obj-y = tests/libqos/pci.o tests/libqos/fw_cfg.o tests/libqos/malloc.o
 libqos-obj-y += tests/libqos/i2c.o tests/libqos/libqos.o
@@ -488,6 +514,8 @@ tests/spapr-phb-test$(EXESUF): tests/spapr-phb-test.o $(libqos-obj-y)
 tests/fdc-test$(EXESUF): tests/fdc-test.o
 tests/ide-test$(EXESUF): tests/ide-test.o $(libqos-pc-obj-y)
 tests/ahci-test$(EXESUF): tests/ahci-test.o $(libqos-pc-obj-y)
+tests/ipmi-kcs-test$(EXESUF): tests/ipmi-kcs-test.o
+tests/ipmi-bt-test$(EXESUF): tests/ipmi-bt-test.o
 tests/hd-geo-test$(EXESUF): tests/hd-geo-test.o
 tests/boot-order-test$(EXESUF): tests/boot-order-test.o $(libqos-obj-y)
 tests/bios-tables-test$(EXESUF): tests/bios-tables-test.o $(libqos-obj-y)

@@ -53,7 +53,7 @@ int recv_all(int fd, void *buf, int len1, bool single_read);
 /* callback function for nonblocking connect
  * valid fd on success, negative error code on failure
  */
-typedef void NonBlockingConnectHandler(int fd, Error *errp, void *opaque);
+typedef void NonBlockingConnectHandler(int fd, Error *err, void *opaque);
 
 InetSocketAddress *inet_parse(const char *str, Error **errp);
 int inet_listen_opts(QemuOpts *opts, int port_offset, Error **errp);
@@ -87,6 +87,25 @@ int socket_dgram(SocketAddress *remote, SocketAddress *local, Error **errp);
 /* Old, ipv4 only bits.  Don't use for new code. */
 int parse_host_port(struct sockaddr_in *saddr, const char *str);
 int socket_init(void);
+
+/**
+ * socket_sockaddr_to_address:
+ * @sa: socket address struct
+ * @salen: size of @sa struct
+ * @errp: pointer to uninitialized error object
+ *
+ * Get the string representation of the socket
+ * address. A pointer to the allocated address information
+ * struct will be returned, which the caller is required to
+ * release with a call qapi_free_SocketAddress when no
+ * longer required.
+ *
+ * Returns: the socket address struct, or NULL on error
+ */
+SocketAddress *
+socket_sockaddr_to_address(struct sockaddr_storage *sa,
+                           socklen_t salen,
+                           Error **errp);
 
 /**
  * socket_local_address:

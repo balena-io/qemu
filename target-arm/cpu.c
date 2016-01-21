@@ -649,7 +649,7 @@ static void arm_cpu_realizefn(DeviceState *dev, Error **errp)
         uint32_t nr = cpu->pmsav7_dregion;
 
         if (nr > 0xff) {
-            error_setg(errp, "PMSAv7 MPU #regions invalid %" PRIu32 "\n", nr);
+            error_setg(errp, "PMSAv7 MPU #regions invalid %" PRIu32, nr);
             return;
         }
 
@@ -1417,9 +1417,12 @@ static void arm_cpu_class_init(ObjectClass *oc, void *data)
     cc->handle_mmu_fault = arm_cpu_handle_mmu_fault;
 #else
     cc->do_interrupt = arm_cpu_do_interrupt;
+    cc->do_unaligned_access = arm_cpu_do_unaligned_access;
     cc->get_phys_page_debug = arm_cpu_get_phys_page_debug;
     cc->vmsd = &vmstate_arm_cpu;
     cc->virtio_is_big_endian = arm_cpu_is_big_endian;
+    cc->write_elf64_note = arm_cpu_write_elf64_note;
+    cc->write_elf32_note = arm_cpu_write_elf32_note;
 #endif
     cc->gdb_num_core_regs = 26;
     cc->gdb_core_xml_file = "arm-core.xml";

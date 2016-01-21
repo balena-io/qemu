@@ -370,9 +370,8 @@ void qdev_init_nofail(DeviceState *dev)
 
     object_property_set_bool(OBJECT(dev), true, "realized", &err);
     if (err) {
-        error_report("Initialization of device %s failed: %s",
-                     object_get_typename(OBJECT(dev)),
-                     error_get_pretty(err));
+        error_reportf_err(err, "Initialization of device %s failed: ",
+                          object_get_typename(OBJECT(dev)));
         exit(1);
     }
 }
@@ -1134,7 +1133,6 @@ post_realize_fail:
 
 fail:
     error_propagate(errp, local_err);
-    return;
 }
 
 static bool device_get_hotpluggable(Object *obj, Error **errp)

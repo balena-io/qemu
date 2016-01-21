@@ -33,7 +33,7 @@
 #ifdef DEBUG_S390_STDOUT
 #define DPRINTF(fmt, ...) \
     do { fprintf(stderr, fmt, ## __VA_ARGS__); \
-         qemu_log(fmt, ##__VA_ARGS__); } while (0)
+         if (qemu_log_separate()) qemu_log(fmt, ##__VA_ARGS__); } while (0)
 #else
 #define DPRINTF(fmt, ...) \
     do { qemu_log(fmt, ## __VA_ARGS__); } while (0)
@@ -133,7 +133,7 @@ int s390_cpu_handle_mmu_fault(CPUState *cs, vaddr orig_vaddr,
     }
 
     /* check out of RAM access */
-    if (raddr > (ram_size + virtio_size)) {
+    if (raddr > ram_size) {
         DPRINTF("%s: raddr %" PRIx64 " > ram_size %" PRIx64 "\n", __func__,
                 (uint64_t)raddr, (uint64_t)ram_size);
         trigger_pgm_exception(env, PGM_ADDRESSING, ILEN_LATER);

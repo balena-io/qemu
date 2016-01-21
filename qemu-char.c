@@ -32,6 +32,7 @@
 #include "qapi/qmp-input-visitor.h"
 #include "qapi/qmp-output-visitor.h"
 #include "qapi-visit.h"
+#include "qemu/base64.h"
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -3264,7 +3265,12 @@ void qmp_ringbuf_write(const char *device, const char *data,
     }
 
     if (has_format && (format == DATA_FORMAT_BASE64)) {
-        write_data = g_base64_decode(data, &write_count);
+        write_data = qbase64_decode(data, -1,
+                                    &write_count,
+                                    errp);
+        if (!write_data) {
+            return;
+        }
     } else {
         write_data = (uint8_t *)data;
         write_count = strlen(data);
@@ -3484,6 +3490,9 @@ static void qemu_chr_parse_file_out(QemuOpts *opts, ChardevBackend *backend,
     }
     backend->u.file = g_new0(ChardevFile, 1);
     backend->u.file->out = g_strdup(path);
+
+    backend->u.file->has_append = true;
+    backend->u.file->append = qemu_opt_get_bool(opts, "append", false);
 }
 
 static void qemu_chr_parse_stdio(QemuOpts *opts, ChardevBackend *backend,
@@ -4041,6 +4050,9 @@ QemuOptsList qemu_chardev_opts = {
         },{
             .name = "chardev",
             .type = QEMU_OPT_STRING,
+        },{
+            .name = "append",
+            .type = QEMU_OPT_BOOL,
         },
         { /* end of list */ }
     },
@@ -4101,7 +4113,13 @@ static CharDriverState *qmp_chardev_open_file(const char *id,
     ChardevFile *file = backend->u.file;
     int flags, in = -1, out;
 
-    flags = O_WRONLY | O_TRUNC | O_CREAT | O_BINARY;
+    flags = O_WRONLY | O_CREAT | O_BINARY;
+    if (file->has_append && file->append) {
+        flags |= O_APPEND;
+    } else {
+        flags |= O_TRUNC;
+    }
+
     out = qmp_chardev_open_file_source(file->out, flags, errp);
     if (out < 0) {
         return NULL;

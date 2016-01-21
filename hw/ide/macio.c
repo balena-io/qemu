@@ -280,7 +280,7 @@ static void pmac_ide_atapi_transfer_cb(void *opaque, int ret)
     }
 
     /* Calculate current offset */
-    offset = (int64_t)(s->lba << 11) + s->io_buffer_index;
+    offset = ((int64_t)s->lba << 11) + s->io_buffer_index;
 
     pmac_dma_read(s->blk, offset, io->len, pmac_ide_atapi_transfer_cb, io);
     return;
@@ -292,8 +292,6 @@ done:
         block_acct_done(blk_get_stats(s->blk), &s->acct);
     }
     io->dma_end(opaque);
-
-    return;
 }
 
 static void pmac_ide_transfer_cb(void *opaque, int ret)
