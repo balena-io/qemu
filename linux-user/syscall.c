@@ -238,10 +238,6 @@ _syscall1(int,exit_group,int,error_code)
 #if defined(TARGET_NR_set_tid_address) && defined(__NR_set_tid_address)
 _syscall1(int,set_tid_address,int *,tidptr)
 #endif
-#if defined(TARGET_NR_futex) && defined(__NR_futex)
-_syscall6(int,sys_futex,int *,uaddr,int,op,int,val,
-          const struct timespec *,timeout,int *,uaddr2,int,val3)
-#endif
 #define __NR_sys_sched_getaffinity __NR_sched_getaffinity
 _syscall3(int, sys_sched_getaffinity, pid_t, pid, unsigned int, len,
           unsigned long *, user_mask_ptr);
@@ -716,6 +712,12 @@ safe_syscall5(int, select, int, nfds, fd_set *, readfds, fd_set *, writefds, \
 #if defined(TARGET_NR_pselect6)
 safe_syscall6(int, sys_pselect6, int, nfds, fd_set *, readfds, fd_set *, writefds, \
     fd_set *, exceptfds, const struct timespec *, timeout, void *, sig);
+#endif
+
+/* futex */
+#if defined(TARGET_NR_futex) && defined(__NR_futex)
+safe_syscall6(int, sys_futex, int *, uaddr, int, op, int, val,
+          const struct timespec *, timeout, int *, uaddr2, int, val3);
 #endif
 
 /* process syscalls */
@@ -5398,12 +5400,11 @@ static int do_futex(target_ulong uaddr, int op, int val, target_ulong timeout,
         } else {
             pts = NULL;
         }
-        return get_errno(sys_futex(g2h(uaddr), op, tswap32(val),
-                         pts, NULL, val3));
+        return safe_sys_futex(g2h(uaddr), op, tswap32(val), pts, NULL, val3);
     case FUTEX_WAKE:
-        return get_errno(sys_futex(g2h(uaddr), op, val, NULL, NULL, 0));
+        return safe_sys_futex(g2h(uaddr), op, val, NULL, NULL, 0);
     case FUTEX_FD:
-        return get_errno(sys_futex(g2h(uaddr), op, val, NULL, NULL, 0));
+        return safe_sys_futex(g2h(uaddr), op, val, NULL, NULL, 0);
     case FUTEX_REQUEUE:
     case FUTEX_CMP_REQUEUE:
     case FUTEX_WAKE_OP:
@@ -5413,11 +5414,10 @@ static int do_futex(target_ulong uaddr, int op, int val, target_ulong timeout,
            to satisfy the compiler.  We do not need to tswap TIMEOUT
            since it's not compared to guest memory.  */
         pts = (struct timespec *)(uintptr_t) timeout;
-        return get_errno(sys_futex(g2h(uaddr), op, val, pts,
-                                   g2h(uaddr2),
+        return safe_sys_futex(g2h(uaddr), op, val, pts, g2h(uaddr2),
                                    (base_op == FUTEX_CMP_REQUEUE
                                     ? tswap32(val3)
-                                    : val3)));
+                                    : val3));
     default:
         return -TARGET_ENOSYS;
     }
@@ -5885,7 +5885,7 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
             ts = cpu->opaque;
             if (ts->child_tidptr) {
                 put_user_u32(0, ts->child_tidptr);
-                sys_futex(g2h(ts->child_tidptr), FUTEX_WAKE, INT_MAX,
+                safe_sys_futex(g2h(ts->child_tidptr), FUTEX_WAKE, INT_MAX,
                           NULL, NULL, 0);
             }
             thread_cpu = NULL;
