@@ -4199,6 +4199,22 @@ int main(int argc, char **argv, char **envp)
     int ret;
     int execfd;
 
+    cpu_set_t cpuset;
+    long ncpus;
+    int sched_cpu;
+
+    srand(time(NULL) + getpid());
+
+    ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+    sched_cpu = rand() % ncpus;
+
+    CPU_ZERO(&cpuset);
+    CPU_SET(sched_cpu, &cpuset);
+
+    if (sched_setaffinity(getpid(), sizeof(cpuset), &cpuset)) {
+        fprintf(stderr, "Warning: Unable to set CPU affinity\n");
+    }
+
     module_call_init(MODULE_INIT_QOM);
 
     if ((envlist = envlist_create()) == NULL) {
