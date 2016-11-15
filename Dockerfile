@@ -13,12 +13,15 @@ RUN apt-get update \
 		make \
 		pkg-config \
 		python \
-		zlib1g-dev
+		zlib1g-dev \
+	&& rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/qemu
 
 COPY . /usr/src/qemu
 
-RUN ./configure --target-list=arm-linux-user --static
+
+ARG TARGET_ARCH=arm-linux-user
+RUN ./configure --target-list=$TARGET_ARCH --static
 
 RUN make -j $(nproc)
