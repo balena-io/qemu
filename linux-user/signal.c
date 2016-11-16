@@ -744,6 +744,27 @@ int do_sigaction(int sig, const struct target_sigaction *act,
     }
 
     k = &sigact_table[sig - 1];
+
+    /* This signal will always fail. This causes golang crash since
+     * https://github.com/golang/go/commit/675eb72c285cd0dd44a5f280bb3fa456ddf6de16
+     *
+     * As explained in that commit, these signals are very rarely used in a
+     * way that causes problems, so it's ok-ish to ignore one of them here.
+     */
+    if (sig == 33) {
+        return 0;
+    }
+    /* This signal will fail because QEMU uses SIGRTMAX for itself. This causes
+     * golang to crash for versions earlier than
+     * https://github.com/golang/go/commit/d10675089d74db0408f2432eae3bd89a8e1c2d6a
+     *
+     * Since after that commit golang ignores that signal, we also ignore it here to
+     * allow earlier versions to run as well.
+     */
+    if (sig == 64) {
+        return 0;
+    }
+
     if (oact) {
         __put_user(k->_sa_handler, &oact->_sa_handler);
         __put_user(k->sa_flags, &oact->sa_flags);
