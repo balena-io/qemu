@@ -13,6 +13,7 @@ RUN apt-get update \
 		make \
 		pkg-config \
 		python \
+		libpixman-1-dev \
 		zlib1g-dev \
 	&& rm -rf /var/lib/apt/lists/*
 
@@ -22,6 +23,6 @@ COPY . /usr/src/qemu
 
 
 ARG TARGET_ARCH=arm-linux-user
-RUN ./configure --target-list=$TARGET_ARCH --static
+RUN ./configure --target-list=$TARGET_ARCH --static --extra-cflags="-DCONFIG_RTNETLINK"
 
 RUN make -j $(nproc)
