@@ -8245,6 +8245,9 @@ static abi_long qemu_execve(char *filename, char *argv[],
             }
         }
 
+        /* Need to store execve argument */
+        offset++;
+
         new_argp = alloca((argc + offset + 1) * sizeof(void *));
 
         /* Copy the original arguments with offset */
@@ -8253,19 +8256,20 @@ static abi_long qemu_execve(char *filename, char *argv[],
         }
 
         new_argp[0] = strdup(qemu_execve_path);
-        new_argp[1] = strdup("-0");
+        new_argp[1] = strdup("-execve"); /* Add execve argument */
+        new_argp[2] = strdup("-0");
         new_argp[offset] = filename;
         new_argp[argc + offset] = NULL;
 
         if (i_name) {
-            new_argp[2] = i_name;
             new_argp[3] = i_name;
+            new_argp[4] = i_name;
 
             if (i_arg) {
-                new_argp[4] = i_arg;
+                new_argp[5] = i_arg;
             }
         } else {
-            new_argp[2] = argv[0];
+            new_argp[3] = argv[0];
         }
     }
 
