@@ -5852,10 +5852,7 @@ static abi_long qemu_execve(char *filename, char *argv[],
 {
     char *i_arg = NULL, *i_name = NULL;
     char **new_argp;
-    /* offset is 4 due to the `[qemu-bin] -execve -0 [arg]` which must preceed
-     * every call to enable propagation of execve behaviour
-     */
-    int argc, fd, ret, i, offset = 4;
+    int argc, fd, ret, i, offset = 3;
     char *cp;
     char buf[BINPRM_BUF_SIZE];
 
@@ -5929,9 +5926,9 @@ static abi_long qemu_execve(char *filename, char *argv[],
         }
 
         if (i_arg) {
-            offset = 6;
-        } else {
             offset = 5;
+        } else {
+            offset = 4;
         }
     }
 
@@ -5943,21 +5940,19 @@ static abi_long qemu_execve(char *filename, char *argv[],
     }
 
     new_argp[0] = strdup(qemu_execve_path);
-    /* Propagate the execve behaviour */
-    new_argp[1] = strdup("-execve");
-    new_argp[2] = strdup("-0");
+    new_argp[1] = strdup("-0");
     new_argp[offset] = filename;
     new_argp[argc + offset] = NULL;
 
     if (i_name) {
+        new_argp[2] = i_name;
         new_argp[3] = i_name;
-        new_argp[4] = i_name;
 
         if (i_arg) {
-            new_argp[5] = i_arg;
+            new_argp[4] = i_arg;
         }
     } else {
-        new_argp[3] = argv[0];
+        new_argp[2] = argv[0];
     }
 
     return get_errno(execve(qemu_execve_path, new_argp, envp));
