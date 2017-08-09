@@ -7679,9 +7679,9 @@ static abi_long qemu_execve(char *filename, char *argv[],
     char *i_arg = NULL, *i_name = NULL;
     char **new_argp;
     const char *new_filename;
-    int argc, fd, ret, i, offset = 3;
+    int argc, fd, fd2, ret, ret2, i, offset = 3;
     char *cp;
-    char buf[BINPRM_BUF_SIZE];
+    char buf[BINPRM_BUF_SIZE], buf2[BINPRM_BUF_SIZE];
 
     /* normal execve case */
     if (qemu_execve_path == NULL || *qemu_execve_path == 0) {
@@ -7712,6 +7712,20 @@ static abi_long qemu_execve(char *filename, char *argv[],
         }
 
         close(fd);
+
+        /* If ELF and same type with qemu, execute normal execve */
+        if ((buf[1] == 'E') && (buf[2] == 'L') && (buf[3] == 'F')) {
+            fd2 = open(qemu_execve_path, O_RDONLY);
+            if (fd2 != -1) {
+                ret2 = read(fd2, buf2, BINPRM_BUF_SIZE);
+                close(fd2);
+                if (!((ret2 == -1) || (ret2 < 2))) {
+                    if (memcmp(buf, buf2, 16) == 0) {
+                        return get_errno(execve(filename, argv, envp));
+                    }
+                }
+            }
+        }
 
         /* adapted from the kernel
          * https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/fs/binfmt_script.c
