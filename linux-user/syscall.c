@@ -8160,12 +8160,10 @@ static int host_to_target_cpu_mask(const unsigned long *host_mask,
 static abi_long qemu_execve(char *filename, char *argv[],
                   char *envp[])
 {
-    char *i_arg = NULL, *i_name = NULL;
     char **new_argp;
     const char *new_filename;
-    int argc, fd, ret, i, offset = 3;
-    char *cp;
-    char buf[BINPRM_BUF_SIZE];
+    int argc, ret, i, offset = 3;
+    struct linux_binprm *bprm;
 
     /* normal execve case */
     if (qemu_execve_path == NULL || *qemu_execve_path == 0) {
@@ -8178,67 +8176,10 @@ static abi_long qemu_execve(char *filename, char *argv[],
             /* nothing */ ;
         }
 
-        fd = open(filename, O_RDONLY);
-        if (fd == -1) {
-            return get_errno(fd);
-        }
-
-        ret = read(fd, buf, BINPRM_BUF_SIZE);
-        if (ret == -1) {
-            close(fd);
-            return get_errno(ret);
-        }
-
-        /* if we have less than 2 bytes, we can guess it is not executable */
-        if (ret < 2) {
-            close(fd);
-            return -host_to_target_errno(ENOEXEC);
-        }
-
-        close(fd);
-
-        /* adapted from the kernel
-         * https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/fs/binfmt_script.c
-         */
-        if ((buf[0] == '#') && (buf[1] == '!')) {
-            /*
-             * This section does the #! interpretation.
-             * Sorta complicated, but hopefully it will work.  -TYT
-             */
-
-            buf[BINPRM_BUF_SIZE - 1] = '\0';
-            cp = strchr(buf, '\n');
-            if (cp == NULL) {
-                cp = buf + BINPRM_BUF_SIZE - 1;
-            }
-            *cp = '\0';
-            while (cp > buf) {
-                cp--;
-                if ((*cp == ' ') || (*cp == '\t')) {
-                    *cp = '\0';
-                } else {
-                    break;
-                }
-            }
-            for (cp = buf + 2; (*cp == ' ') || (*cp == '\t'); cp++) {
-                /* nothing */ ;
-            }
-            if (*cp == '\0') {
-                return -ENOEXEC; /* No interpreter name found */
-            }
-            i_name = cp;
-            i_arg = NULL;
-            for ( ; *cp && (*cp != ' ') && (*cp != '\t'); cp++) {
-                /* nothing */ ;
-            }
-            while ((*cp == ' ') || (*cp == '\t')) {
-                *cp++ = '\0';
-            }
-            if (*cp) {
-                i_arg = cp;
-            }
-
-            if (i_arg) {
+        bprm = alloca(sizeof(struct linux_binprm));
+        ret = load_script_file(filename, bprm);
+        if (ret==0) {
+            if (bprm->argv != NULL) {
                 offset = 5;
             } else {
                 offset = 4;
@@ -8261,12 +8202,12 @@ static abi_long qemu_execve(char *filename, char *argv[],
         new_argp[offset] = filename;
         new_argp[argc + offset] = NULL;
 
-        if (i_name) {
-            new_argp[3] = i_name;
-            new_argp[4] = i_name;
+        if (ret==0) {
+            new_argp[3] = bprm->filename;
+            new_argp[4] = bprm->filename;
 
-            if (i_arg) {
-                new_argp[5] = i_arg;
+            if (bprm->argv != NULL) {
+                new_argp[5] = bprm->argv[0];
             }
         } else {
             new_argp[3] = argv[0];

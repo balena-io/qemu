@@ -128,12 +128,41 @@ int loader_exec(int fdexec, const char *filename, char **argv, char **envp,
              struct target_pt_regs * regs, struct image_info *infop,
              struct linux_binprm *bprm)
 {
-    int retval;
+    int retval, fd, offset = 1, argc = count(argv);
+    char **new_argp;
 
-    bprm->fd = fdexec;
-    bprm->filename = (char *)filename;
-    bprm->argc = count(argv);
-    bprm->argv = argv;
+    retval = load_script_file(filename, bprm);
+    if (retval==0) {
+        if (bprm->argv != NULL) {
+            offset = 2;
+        }
+        new_argp = alloca((argc + offset + 1) * sizeof(void *));
+
+        new_argp[0] = (char *)filename;
+        if (bprm->argv != NULL) {
+            new_argp[1] = bprm->argv[0];
+        }
+        /* Copy the original arguments with offset */
+        for (int i = 0; i < argc; i++) {
+            new_argp[i + offset] = argv[i];
+        }
+        new_argp[argc + offset] = NULL;
+
+        bprm->argc = count(new_argp);
+        bprm->argv = new_argp;
+        fd = open(bprm->filename, O_RDONLY);
+        if (fd < 0) {
+            printf("Error while loading %s: %s\n", bprm->filename, strerror(errno));
+            _exit(EXIT_FAILURE);
+        }
+        bprm->fd = fd;
+    } else {
+        bprm->filename = (char *)filename;
+        bprm->argc = count(argv);
+        bprm->argv = argv;
+        bprm->fd = fdexec;
+    }
+
     bprm->envc = count(envp);
     bprm->envp = envp;
 
