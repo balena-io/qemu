@@ -9,6 +9,7 @@ common_user_inc += include_directories('include')
 
 linux_user_ss.add(files(
   'elfload.c',
+  'scriptload.c',
   'exit.c',
   'fd-trans.c',
   'linuxload.c',

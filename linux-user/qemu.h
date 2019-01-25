@@ -159,7 +159,11 @@ typedef struct TaskState {
     uint64_t start_boottime;
 } TaskState;
 
+
+/* balena */
 extern const char *qemu_execve_path;
+int load_script_file(const char *filename, struct linux_binprm *bprm);
+
 abi_long do_brk(abi_ulong new_brk);
 
 /* user access */
