@@ -1,5 +1,5 @@
 obj-y = main.o syscall.o strace.o mmap.o signal.o \
-	elfload.o linuxload.o uaccess.o uname.o \
+	elfload.o scriptload.o linuxload.o uaccess.o uname.o \
 	safe-syscall.o $(TARGET_ABI_DIR)/signal.o \
         $(TARGET_ABI_DIR)/cpu_loop.o exit.o fd-trans.o
 
