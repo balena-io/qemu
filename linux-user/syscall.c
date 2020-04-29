@@ -8178,7 +8178,16 @@ static abi_long qemu_execve(char *filename, char *argv[],
 
         bprm = alloca(sizeof(struct linux_binprm));
         ret = load_script_file(filename, bprm);
-        if (ret==0) {
+
+        if (ret < 0) {
+          if (ret == -1) {
+            return get_errno(ret);
+          } else {
+            return -host_to_target_errno(ENOEXEC);
+          }
+        }
+
+        if (ret == 0) {
             if (bprm->argv != NULL) {
                 offset = 5;
             } else {
