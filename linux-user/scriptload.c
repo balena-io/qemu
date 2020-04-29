@@ -17,13 +17,13 @@ int load_script_file(const char *filename, struct linux_binprm *bprm)
     /* Check if it is a script */
     fd = open(filename, O_RDONLY);
     if (fd == -1) {
-        return -ENOEXEC;
+        return fd;
     }
 
     retval = read(fd, buf, BPRM_BUF_SIZE);
     if (retval == -1) {
         close(fd);
-        return -ENOEXEC;
+        return retval;
     }
 
      /* if we have less than 2 bytes, we can guess it is not executable */
