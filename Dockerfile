@@ -1,28 +1,20 @@
-# Use this dockerfile to build the qemu binary
+FROM debian:stretch
 
-FROM debian:jessie
-
-RUN apt-get update \
-	&& apt-get install -y \
-		autoconf \
-		bison \
-		build-essential \
-		flex \
-		libglib2.0-dev \
-		libtool \
-		make \
-		pkg-config \
-		python \
-		libpixman-1-dev \
-		zlib1g-dev \
-	&& rm -rf /var/lib/apt/lists/*
+RUN apt-get -q update \
+        && apt-get -qqy install \
+                build-essential \
+                zlib1g-dev \
+                libpixman-1-dev \
+                python \
+                libglib2.0-dev \
+                pkg-config \
+                curl \
+                jq \
+                git \
+        && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/qemu
 
 COPY . /usr/src/qemu
 
-
-ARG TARGET_ARCH=arm-linux-user
-RUN ./configure --target-list=$TARGET_ARCH --static --extra-cflags="-DCONFIG_RTNETLINK"
-
-RUN make -j $(nproc)
+CMD ./build.sh
