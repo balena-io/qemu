@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -x
 set -o errexit
 
 git checkout "$RELEASE_COMMIT"
@@ -12,9 +13,9 @@ for TARGET in $TARGETS; do
 
 	./configure --target-list="$TARGET-linux-user" --static --extra-cflags="-DCONFIG_RTNETLINK" \
 		&& make -j $(nproc) \
-		&& strip "$TARGET-linux-user/qemu-$TARGET" \
+		&& strip "build/$TARGET-linux-user/qemu-$TARGET" \
 		&& mkdir -p "$PACKAGE_NAME" \
-		&& cp "$TARGET-linux-user/qemu-$TARGET" "$PACKAGE_NAME/$BINARY_NAME"
+		&& cp "build/$TARGET-linux-user/qemu-$TARGET" "$PACKAGE_NAME/$BINARY_NAME"
 
 	tar -cvzf "$PACKAGE_NAME.tar.gz" "$PACKAGE_NAME"
 done

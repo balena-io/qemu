@@ -1,4 +1,4 @@
-FROM debian:stretch
+FROM debian:buster
 
 RUN apt-get -q update \
         && apt-get -qqy install \
@@ -6,8 +6,10 @@ RUN apt-get -q update \
                 zlib1g-dev \
                 libpixman-1-dev \
                 python \
+                python3 \
                 libglib2.0-dev \
                 pkg-config \
+                ninja-build \
                 curl \
                 jq \
                 git \
