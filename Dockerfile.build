@@ -1,20 +1,20 @@
 # Use this dockerfile to build the qemu binary
 
-FROM debian:jessie
+FROM debian:buster
 
-RUN apt-get update \
-	&& apt-get install -y \
-		autoconf \
-		bison \
-		build-essential \
-		flex \
-		libglib2.0-dev \
-		libtool \
-		make \
-		pkg-config \
-		python \
-		libpixman-1-dev \
-		zlib1g-dev \
+RUN apt-get -q update \
+	&& apt-get -qqy install \
+			build-essential \
+			zlib1g-dev \
+			libpixman-1-dev \
+			python \
+			python3 \
+			libglib2.0-dev \
+			pkg-config \
+			ninja-build \
+			curl \
+			jq \
+			git \
 	&& rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/qemu
