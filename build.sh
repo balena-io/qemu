@@ -11,7 +11,7 @@ for TARGET in $TARGETS; do
 	BINARY_NAME="qemu-$TARGET-static"
 	PACKAGE_NAME="qemu-$QEMU_VERSION-$TARGET"
 
-	./configure --target-list="$TARGET-linux-user" --static --extra-cflags="-DCONFIG_RTNETLINK" \
+	./configure --target-list="$TARGET-linux-user" --static --disable-pie --extra-cflags="-DCONFIG_RTNETLINK" \
 		&& make -j $(nproc) \
 		&& strip "build/$TARGET-linux-user/qemu-$TARGET" \
 		&& mkdir -p "$PACKAGE_NAME" \
