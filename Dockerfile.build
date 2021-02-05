@@ -23,6 +23,6 @@ COPY . /usr/src/qemu
 
 
 ARG TARGET_ARCH=arm-linux-user
-RUN ./configure --target-list=$TARGET_ARCH --static --extra-cflags="-DCONFIG_RTNETLINK"
+RUN ./configure --target-list=$TARGET_ARCH --static --disable-pie --extra-cflags="-DCONFIG_RTNETLINK"
 
 RUN make -j $(nproc)
