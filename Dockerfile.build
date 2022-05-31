@@ -1,0 +1,28 @@
+# Use this dockerfile to build the qemu binary
+
+FROM debian:buster
+
+RUN apt-get -q update \
+	&& apt-get -qqy install \
+			build-essential \
+			zlib1g-dev \
+			libpixman-1-dev \
+			python \
+			python3 \
+			libglib2.0-dev \
+			pkg-config \
+			ninja-build \
+			curl \
+			jq \
+			git \
+	&& rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/src/qemu
+
+COPY . /usr/src/qemu
+
+
+ARG TARGET_ARCH=arm-linux-user
+RUN ./configure --target-list=$TARGET_ARCH --static --disable-pie --extra-cflags="-DCONFIG_RTNETLINK"
+
+RUN make -j $(nproc)

@@ -123,6 +123,7 @@
 #include <libdrm/drm.h>
 #include <libdrm/i915_drm.h>
 #endif
+#include <linux/binfmts.h>
 #include "linux_loop.h"
 #include "uname.h"
 
@@ -8524,6 +8525,86 @@ static int do_getdents64(abi_long dirfd, abi_long arg2, abi_long count)
 _syscall2(int, pivot_root, const char *, new_root, const char *, put_old)
 #endif
 
+/* qemu_execve() Must return target values and target errnos. */
+static abi_long qemu_execve(char *filename, char *argv[],
+                  char *envp[])
+{
+    char **new_argp;
+    const char *new_filename;
+    int argc, ret, i, offset = 3;
+    struct linux_binprm *bprm;
+
+    /* normal execve case */
+    if (qemu_execve_path == NULL || *qemu_execve_path == 0) {
+        new_filename = filename;
+        new_argp = argv;
+    } else {
+        new_filename = qemu_execve_path;
+
+        for (argc = 0; argv[argc] != NULL; argc++) {
+            /* nothing */ ;
+        }
+
+        bprm = alloca(sizeof(struct linux_binprm));
+        ret = load_script_file(filename, bprm);
+
+        if (ret < 0) {
+          if (ret == -1) {
+            return get_errno(ret);
+          } else {
+            return -host_to_target_errno(ENOEXEC);
+          }
+        }
+
+        if (ret == 0) {
+            if (bprm->argv != NULL) {
+                offset = 5;
+            } else {
+                offset = 4;
+            }
+        }
+
+        /* Need to store execve argument */
+        offset++;
+
+        new_argp = alloca((argc + offset + 1) * sizeof(void *));
+
+        /* Copy the original arguments with offset */
+        for (i = 0; i < argc; i++) {
+            new_argp[i + offset] = argv[i];
+        }
+
+        new_argp[0] = strdup(qemu_execve_path);
+        new_argp[1] = strdup("-execve"); /* Add execve argument */
+        new_argp[2] = strdup("-0");
+        new_argp[offset] = filename;
+        new_argp[argc + offset] = NULL;
+
+        if (ret==0) {
+            new_argp[3] = bprm->filename;
+            new_argp[4] = bprm->filename;
+
+            if (bprm->argv != NULL) {
+                new_argp[5] = bprm->argv[0];
+            }
+        } else {
+            new_argp[3] = argv[0];
+        }
+    }
+
+    /* Although execve() is not an interruptible syscall it is
+     * a special case where we must use the safe_syscall wrapper:
+     * if we allow a signal to happen before we make the host
+     * syscall then we will 'lose' it, because at the point of
+     * execve the process leaves QEMU's control. So we use the
+     * safe syscall wrapper to ensure that we either take the
+     * signal as a guest signal, or else it does not happen
+     * before the execve completes and makes it the other
+     * program's problem.
+     */
+    return get_errno(safe_execve(new_filename, new_argp, envp));
+}
+
 /* This is an internal helper for do_syscall so that it is easier
  * to have a single return point, so that actions, such as logging
  * of syscall results, can be performed.
@@ -8803,17 +8884,7 @@ static abi_long do_syscall1(void *cpu_env, int num, abi_long arg1,
 
             if (!(p = lock_user_string(arg1)))
                 goto execve_efault;
-            /* Although execve() is not an interruptible syscall it is
-             * a special case where we must use the safe_syscall wrapper:
-             * if we allow a signal to happen before we make the host
-             * syscall then we will 'lose' it, because at the point of
-             * execve the process leaves QEMU's control. So we use the
-             * safe syscall wrapper to ensure that we either take the
-             * signal as a guest signal, or else it does not happen
-             * before the execve completes and makes it the other
-             * program's problem.
-             */
-            ret = get_errno(safe_execve(p, argp, envp));
+            ret = qemu_execve(p, argp, envp);
             unlock_user(p, arg1, 0);
 
             goto execve_end;
