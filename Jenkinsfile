@@ -16,7 +16,7 @@ pipeline {
         string defaultValue: 'master', description: 'QEMU Git branch', name: 'RELEASE_BRANCH', trim: true
         string defaultValue: 'balena-io', description: 'GitHub org', name: 'ACCOUNT', trim: true
         string defaultValue: 'qemu', description: 'GitHub repository', name: 'REPO', trim: true
-        string defaultValue: '', description: '(e.g.) v5.2.0+balena1', name: 'QEMU_VERSION', trim: true
+        string defaultValue: '', description: '(e.g.) 7.0.0+balena1', name: 'QEMU_VERSION', trim: true
         string defaultValue: '', description: 'Git commit hash', name: 'RELEASE_COMMIT', trim: true
         credentials credentialType: 'org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl', defaultValue: '169db7d9-d27d-42ca-92fb-215663537c34', description: 'GitHub access token credentials', name: 'GIT_TOKEN_CREDENTIALS', required: true
         credentials credentialType: 'com.cloudbees.jenkins.plugins.sshcredentials.impl.BasicSSHUserPrivateKey', defaultValue: 'a2d8eaf4-a373-4efa-a9e3-c331a3687e72', description: 'GitHub SSH credentials', name: 'GIT_SSH_CREDENTIALS', required: true
