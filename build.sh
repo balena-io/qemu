@@ -41,8 +41,8 @@ cat > request.json <<-EOF
     "prerelease": false
 }
 EOF
-curl --data "@request.json" --header "Content-Type:application/json" \
-	"https://api.github.com/repos/$ACCOUNT/$REPO/releases?access_token=$ACCESS_TOKEN" \
+curl --data "@request.json" -H "Authorization:token $ACCESS_TOKEN" -H "Content-Type:application/json" \
+	"https://api.github.com/repos/$ACCOUNT/$REPO/releases" \
 	-o response.json
 # Parse response
 RELEASE_ID=$(cat response.json | jq '.id')
